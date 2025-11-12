@@ -122,6 +122,14 @@
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
 }
 
+.notes-flow-canvas--placing .react-flow__pane {
+  cursor: crosshair !important;
+}
+
+.notes-flow-canvas--connecting .react-flow__pane {
+  cursor: pointer !important;
+}
+
 .notes-flow-wrapper .react-flow__minimap {
   background-color: rgba(248, 250, 252, 0.95);
   border: 1px solid rgba(148, 163, 184, 0.4);

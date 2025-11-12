@@ -130,8 +130,10 @@ export default function NotesFlow() {
         setNodes((nds) => nds.concat(newNode))
         return { ...prev, [selectedNodeType]: nextCount }
       })
+
+      setSelectedNodeType(null)
     },
-    [selectedNodeType, setNodes]
+    [selectedNodeType, setNodes, setSelectedNodeType]
   )
 
   const handlePaneClick = useCallback(
@@ -152,12 +154,22 @@ export default function NotesFlow() {
 
   const handleSelectType = useCallback(
     (type) => {
-      setSelectedNodeType((current) => (current === type ? null : type))
+      setSelectedNodeType((current) => {
+        const isSameType = current === type
+
+        if (!isSameType) {
+          setConnectionMode(false)
+          setConnectionSource(null)
+        }
+
+        return isSameType ? null : type
+      })
     },
-    []
+    [setConnectionMode, setConnectionSource]
   )
 
   const toggleConnectionMode = useCallback(() => {
+    setSelectedNodeType(null)
     setConnectionMode((active) => {
       if (active) {
         setConnectionSource(null)
@@ -180,23 +192,28 @@ export default function NotesFlow() {
           return node.id
         }
 
-        if (currentSource !== node.id) {
-          setEdges((eds) =>
-            addEdge(
-              {
-                id: `manual-${currentSource}-${node.id}-${Date.now()}`,
-                source: currentSource,
-                target: node.id,
-                type: 'step',
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  color: '#1d4ed8',
-                },
-              },
-              eds
-            )
-          )
+        if (currentSource === node.id) {
+          setConnectionMode(false)
+          return null
         }
+
+        setEdges((eds) =>
+          addEdge(
+            {
+              id: `manual-${currentSource}-${node.id}-${Date.now()}`,
+              source: currentSource,
+              target: node.id,
+              type: 'step',
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#1d4ed8',
+              },
+            },
+            eds
+          )
+        )
+
+        setConnectionMode(false)
 
         return null
       })
@@ -273,6 +290,14 @@ export default function NotesFlow() {
     <div className={`shape-preview shape-preview--${type}`} />
   )
 
+  const canvasClassName = [
+    'notes-flow-canvas',
+    selectedNodeType && !connectionMode ? 'notes-flow-canvas--placing' : '',
+    connectionMode ? 'notes-flow-canvas--connecting' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div className="notes-flow-wrapper">
       <div className="notes-flow-toolbar">
@@ -347,7 +372,7 @@ export default function NotesFlow() {
       </div>
 
       <ReactFlow
-        className="notes-flow-canvas"
+        className={canvasClassName}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
