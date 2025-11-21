@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import FlowHelloWorld from '../FlowHelloWorld/FlowHelloWorld'
 import NotesFlow from '../Notes/NotesFlow'
 import LeaveRequestModal from '../LeaveRequestModal/LeaveRequestModal'
 
@@ -71,24 +70,14 @@ function Dashboard() {
                 Taleplerim
               </button>
               <button
-                onClick={() => setActiveTab('notes')}
+                onClick={() => setActiveTab('flow-design')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                  activeTab === 'notes'
+                  activeTab === 'flow-design'
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
-                Notlar
-              </button>
-              <button
-                onClick={() => setActiveTab('flow')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                  activeTab === 'flow'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                Flow
+                Akış Tasarımı
               </button>
             </nav>
           </div>
@@ -229,32 +218,18 @@ function Dashboard() {
             </div>
           )}
 
-          {/* Notlar */}
-          {activeTab === 'notes' && (
+          {/* Akış Tasarımı (Birleştirilmiş Notes ve Flow) */}
+          {activeTab === 'flow-design' && (
             <div>
               <div className="mb-6">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Notlar</h2>
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Akış Tasarımı</h2>
                 <p className="text-sm text-slate-600">
-                  Süreç notlarınızı kare, daire ve üçgen düğümlerle görselleştirin.
+                  İş akışlarını tasarlayın, kaydedin ve yönetin.
                 </p>
               </div>
 
               <div className="w-full bg-slate-50 border border-slate-200 rounded-lg relative overflow-visible">
                 <NotesFlow />
-              </div>
-            </div>
-          )}
-
-          {/* Flow */}
-          {activeTab === 'flow' && (
-            <div>
-              <div className="mb-6">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Flow</h2>
-                <p className="text-sm text-slate-600">İş akışı diyagramı</p>
-              </div>
-              
-              <div className="w-full h-96 bg-slate-50 border border-slate-200 rounded-lg relative overflow-hidden" style={{ position: 'relative' }}>
-                <FlowHelloWorld />
               </div>
             </div>
           )}
@@ -275,4 +250,3 @@ function Dashboard() {
 }
 
 export default Dashboard
-
