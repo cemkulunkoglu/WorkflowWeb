@@ -17,7 +17,9 @@ import StepNode from './Step/StepNode'
 import StepEdge from './Step/StepEdge'
 import './NotesFlow.css'
 
-import { API_ROUTES } from '../../config/apiConfig'
+// 👇 Axios Client'ı kullanıyoruz (Token'ı bu ekliyor)
+import axiosClient from '../../config/axiosClient'; 
+import { API_ROUTES } from '../../config/apiConfig';
 
 const STORAGE_FLOW_ID_KEY = 'notes-flow-id'
 
@@ -31,14 +33,12 @@ const edgeTypes = {
   step: StepEdge,
 }
 
-export default function NotesFlow() {
+export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }) {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
-  
-  // Tasarım adı için state ekledik (API için zorunlu)
   const [designName, setDesignName] = useState('Yeni Akış Tasarımı')
-  
   const [nodeCounts, setNodeCounts] = useState({ start: 0, decision: 0, step: 0 })
+  
   const [selectedNodeType, setSelectedNodeType] = useState(null)
   const [reactFlowInstance, setReactFlowInstance] = useState(null)
   const [connectionMode, setConnectionMode] = useState(false)
@@ -46,18 +46,16 @@ export default function NotesFlow() {
   const [selectedNodeIds, setSelectedNodeIds] = useState([])
   const [activeNodeId, setActiveNodeId] = useState(null)
   const [labelEditorValue, setLabelEditorValue] = useState('')
-  const [flowId, setFlowId] = useState(null)
+  // Prop flowId varsa onunla başlat, yoksa null
+  const [flowId, setFlowId] = useState(propFlowId || null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState(null)
 
-  // --- NODE SAYACI (ID üretmek için) ---
   const computeCountsFromNodes = useCallback((nodeList) => {
     const counts = { start: 0, decision: 0, step: 0 }
     nodeList.forEach((node) => {
       const { type, id } = node
       if (!(type in counts)) counts[type] = 0
-
-      // ID formatı: "type-index" (örn: step-5)
       const match = id.match(/^(start|decision|step)-(\d+)$/)
       if (match) {
         const [, matchedType, index] = match
@@ -69,44 +67,38 @@ export default function NotesFlow() {
     return counts
   }, [])
 
-  // --- VERİ YÜKLEME (READ) ---
+  // --- VERİ YÜKLEME (READ - AXIOS) ---
   useEffect(() => {
     const loadFlowDesign = async () => {
-      // 1. Önce LocalStorage'da kayıtlı bir ID var mı bakalım
-      const storedFlowId = window.localStorage.getItem(STORAGE_FLOW_ID_KEY)
+      let targetId = propFlowId;
       
-      // ID yoksa (ilk açılış) boş başla
-      if (!storedFlowId) return;
+      // Eğer component prop olmadan çalışıyorsa (eski sayfa mantığı)
+      if (propFlowId === undefined) {
+         targetId = window.localStorage.getItem(STORAGE_FLOW_ID_KEY)
+      }
 
-      setFlowId(storedFlowId);
+      // Yeni Kayıt Modu (targetId null ise)
+      if (!targetId) {
+        setFlowId(null);
+        setNodes([]);
+        setEdges([]);
+        setDesignName('Yeni Akış Tasarımı');
+        setNodeCounts({ start: 0, decision: 0, step: 0 });
+        return;
+      }
+
+      // Düzenleme Modu
+      setFlowId(targetId);
 
       try {
-        // 2. API'den veriyi çek
-        const response = await fetch(API_ROUTES.WORKFLOW.GET_BY_ID(storedFlowId))
+        // Axios ile GET isteği
+        const response = await axiosClient.get(API_ROUTES.WORKFLOW.GET_BY_ID(targetId));
+        const data = response.data;
         
-        if (!response.ok) {
-           if(response.status === 404) {
-               // Eğer ID localstorage'da var ama DB'de yoksa temizle
-               window.localStorage.removeItem(STORAGE_FLOW_ID_KEY);
-               setFlowId(null);
-               return;
-           }
-           throw new Error(`Veri çekilemedi: ${response.statusText}`);
-        }
-
-        const data = await response.json()
-        
-        // 3. State'i güncelle
-        // Backend'den gelen veri zaten React Flow formatına uygun (DTO'da ayarlamıştık)
         if (data.nodes) setNodes(data.nodes)
         if (data.edges) setEdges(data.edges)
-        
-        // Design adını güncelle (DTO'da varsa, yoksa varsayılan)
-        // Not: Şu anki DTO yapımızda GetById sadece node ve edge dönüyor, 
-        // eğer designName'i de dönmesini istersen Backend DTO'yu güncellemen gerekebilir.
-        // Şimdilik varsayılan kalabilir veya backend'i güncelleyebiliriz.
+        if (data.designName) setDesignName(data.designName); // Backend ismini desteklerse
 
-        // Node sayacını güncelle
         if (data.nodes) {
             const counts = computeCountsFromNodes(data.nodes);
             setNodeCounts(counts);
@@ -114,42 +106,42 @@ export default function NotesFlow() {
 
       } catch (error) {
         console.error("Yükleme hatası:", error);
-        setSaveMessage({ type: 'error', text: 'Veri yüklenemedi' });
+        if (error.response && error.response.status === 404) {
+             // Sadece local modda ise temizle
+             if(propFlowId === undefined) {
+                window.localStorage.removeItem(STORAGE_FLOW_ID_KEY);
+             }
+             setFlowId(null);
+        } else {
+             setSaveMessage({ type: 'error', text: 'Veri yüklenemedi' });
+        }
       }
     }
 
     loadFlowDesign();
-  }, [computeCountsFromNodes, setNodes, setEdges])
+  }, [propFlowId, computeCountsFromNodes, setNodes, setEdges]) // propFlowId eklendi
 
   const onConnect = useCallback(
     (params) =>
       setEdges((eds) =>
         addEdge(
-          {
-            ...params,
-            type: 'step',
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#1d4ed8' },
-          },
+          { ...params, type: 'step', markerEnd: { type: MarkerType.ArrowClosed, color: '#1d4ed8' } },
           eds
         )
       ),
     [setEdges]
   )
 
-  // --- YENİ DÜĞÜM EKLEME ---
   const addNodeAtPosition = useCallback(
     (position) => {
       if (!selectedNodeType) return
-
       setNodeCounts((prev) => {
         const nextCount = prev[selectedNodeType] + 1
         const newNode = {
-          id: `${selectedNodeType}-${nextCount}`, // Geçici Frontend ID'si
+          id: `${selectedNodeType}-${nextCount}`,
           type: selectedNodeType,
           position,
-          data: {
-            label: selectedNodeType === 'start' ? 'Başlangıç' : selectedNodeType === 'decision' ? 'Karar' : 'Adım',
-          },
+          data: { label: selectedNodeType === 'start' ? 'Başlangıç' : selectedNodeType === 'decision' ? 'Karar' : 'Adım' },
         }
         setNodes((nds) => nds.concat(newNode))
         return { ...prev, [selectedNodeType]: nextCount }
@@ -162,214 +154,154 @@ export default function NotesFlow() {
   const handlePaneClick = useCallback(
     (event) => {
       if (!selectedNodeType || !reactFlowInstance || connectionMode) return
-      const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      })
+      const position = reactFlowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY })
       addNodeAtPosition(position)
     },
     [addNodeAtPosition, reactFlowInstance, selectedNodeType, connectionMode]
   )
 
-  // --- TOOLBAR İŞLEMLERİ ---
+  // --- TOOLBAR HANDLERS ---
   const handleSelectType = useCallback((type) => {
       setSelectedNodeType((current) => {
         const isSameType = current === type
-        if (!isSameType) {
-          setConnectionMode(false)
-          setConnectionSource(null)
-        }
+        if (!isSameType) { setConnectionMode(false); setConnectionSource(null); }
         return isSameType ? null : type
       })
-    }, [setConnectionMode, setConnectionSource])
+    }, [])
 
   const toggleConnectionMode = useCallback(() => {
     setSelectedNodeType(null)
-    setConnectionMode((active) => {
-      if (active) setConnectionSource(null)
-      return !active
-    })
+    setConnectionMode((active) => { if (active) setConnectionSource(null); return !active })
   }, [])
 
   const handleNodeClick = useCallback((event, node) => {
       if (!connectionMode) return
-      event.preventDefault()
-      event.stopPropagation()
+      event.preventDefault(); event.stopPropagation()
       setSelectedNodeType(null)
-
       setConnectionSource((currentSource) => {
         if (!currentSource) return node.id
-        if (currentSource === node.id) {
-          setConnectionMode(false)
-          return null
-        }
-        setEdges((eds) =>
-          addEdge(
-            {
+        if (currentSource === node.id) { setConnectionMode(false); return null }
+        setEdges((eds) => addEdge({
               id: `manual-${currentSource}-${node.id}-${Date.now()}`,
-              source: currentSource,
-              target: node.id,
-              type: 'step',
+              source: currentSource, target: node.id, type: 'step',
               markerEnd: { type: MarkerType.ArrowClosed, color: '#1d4ed8' },
-            },
-            eds
-          )
-        )
+            }, eds))
         setConnectionMode(false)
         return null
       })
-    }, [connectionMode, setEdges, setSelectedNodeType])
+    }, [connectionMode, setEdges])
 
   const handleSelectionChange = useCallback(({ nodes: selected }) => {
     const selectedNodes = selected ?? []
     const ids = selectedNodes.map((node) => node.id)
     setSelectedNodeIds(ids)
-
     if (selectedNodes.length === 1) {
-      const node = selectedNodes[0]
-      setActiveNodeId(node.id)
-      setLabelEditorValue(node.data?.label || '')
+      setActiveNodeId(selectedNodes[0].id)
+      setLabelEditorValue(selectedNodes[0].data?.label || '')
     } else {
-      setActiveNodeId(null)
-      setLabelEditorValue('')
+      setActiveNodeId(null); setLabelEditorValue('')
     }
   }, [])
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedNodeIds.length === 0) return
     setNodes((nds) => nds.filter((node) => !selectedNodeIds.includes(node.id)))
-    setEdges((eds) =>
-      eds.filter((edge) => !selectedNodeIds.includes(edge.source) && !selectedNodeIds.includes(edge.target))
-    )
-    setSelectedNodeIds([])
-    setActiveNodeId(null)
-    setLabelEditorValue('')
+    setEdges((eds) => eds.filter((edge) => !selectedNodeIds.includes(edge.source) && !selectedNodeIds.includes(edge.target)))
+    setSelectedNodeIds([]); setActiveNodeId(null); setLabelEditorValue('')
   }, [selectedNodeIds, setEdges, setNodes])
 
   const handleLabelInputChange = useCallback((event) => {
       const value = event.target.value
       setLabelEditorValue(value)
       if (!activeNodeId) return
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === activeNodeId ? { ...node, data: { ...node.data, label: value } } : node
-        )
-      )
+      setNodes((nds) => nds.map((node) => node.id === activeNodeId ? { ...node, data: { ...node.data, label: value } } : node))
     }, [activeNodeId, setNodes])
 
-  // --- VERİ DÖNÜŞÜMÜ VE KAYDETME (CREATE/UPDATE) ---
+  // --- KAYDETME (SAVE - AXIOS) ---
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     setSaveMessage(null)
 
-    // 1. React Flow verisini Backend DTO formatına çevir
-    // Backend DTO: { designName, nodes: [{ x, y, label, type }], edges: [{ source, target, label }] }
     const payload = {
         designName: designName,
         nodes: nodes.map(node => ({
             label: node.data.label,
             type: node.type,
-            // React Flow 'position' objesi kullanır, Backend düz X ve Y ister
             x: node.position.x, 
             y: node.position.y
         })),
         edges: edges.map(edge => ({
             source: edge.source,
             target: edge.target,
-            label: edge.label || "" // Edge label opsiyonel
+            label: edge.label || "" 
         }))
     }
 
     try {
-      let url = API_ROUTES.WORKFLOW.CREATE
-      let method = 'POST'
+      let url = API_ROUTES.WORKFLOW.CREATE;
+      let axiosMethod = axiosClient.post; // Varsayılan POST (Create)
 
-      // ID varsa Update moduna geç
       if (flowId) {
-        url = API_ROUTES.WORKFLOW.UPDATE(flowId)
-        method = 'PUT'
+        url = API_ROUTES.WORKFLOW.UPDATE(flowId);
+        axiosMethod = axiosClient.put; // Update ise PUT
       }
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      // 👇 DÜZELTME: fetch yerine axiosClient kullanıyoruz!
+      const response = await axiosMethod(url, payload);
+      const result = response.data;
 
-      if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`Hata: ${errText || response.statusText}`);
-      }
-
-      // 2. Backend'den dönen GÜNCEL veriyi al
-      // (Full Replacement yaptığımız için Node ID'leri değişti, yenilerini almalıyız!)
-      const result = await response.json()
-
-      // 3. State'i backend verisiyle güncelle
-      // Bu sayede ekrandaki node'ların ID'leri backend ID'leriyle senkronize olur
       if(result.nodes) setNodes(result.nodes)
       if(result.edges) setEdges(result.edges)
       
-      // Design ID'yi sakla (Create ise yeni oluştu)
-      if (!flowId && result.nodes && result.nodes.length > 0) {
-          // Backend response'da Design ID dönmüyor olabilir, nodes üzerinden kontrol edebiliriz 
-          // Veya Create işlemi DesignDto dönmeli. 
-          // Eğer backend GetFlowDesignById dönüyorsa sorun yok.
-          // Biz ID'yi localstorage'a kaydedelim ama result içinde root ID yoksa 
-          // backend response'unu kontrol etmemiz gerekebilir.
-          
-          // Şimdilik update mantığımız çalıştığı için flowId değişmiyor ama
-          // Create işleminden sonra ID'yi yakalamak için backend create metodundan ID dönmesi önemli.
-          // Varsayım: Backend DTO dönüyor ama Design ID içinde yoksa, URL'den alamayız.
-          // ** Backend Create metodu Design ID içeren bir DTO dönmeli. **
+      // İlk kayıtsa ve backend ID döndüyse ID'yi sakla
+      if (!flowId && result.id) {
+         setFlowId(result.id);
+         // Sadece prop yoksa localstorage kullan
+         if (propFlowId === undefined) {
+            window.localStorage.setItem(STORAGE_FLOW_ID_KEY, result.id);
+         }
       }
       
-      // Create işlemi sonrası URL'den veya response'dan ID'yi yakalamak için 
-      // Backend'de Create işleminde "CreatedAtAction" kullandık, header'dan location alabiliriz 
-      // Veya result'un kendisi DTO ise ve içinde ID yoksa bu kısım eksik kalabilir.
-      // Çözüm: Eğer ilk kayıtsa, dönen verideki Node'lardan birinin ID'sini değil,
-      // Response Header'dan veya backend'i güncelleyerek DesignId almalıyız.
-      // Şimdilik "Update" yaparken FlowId zaten var. "Create" yaparken
-      // sunucudan dönen veriyi kullanıyoruz.
-
-      // Create işleminden sonra ID'yi almanın pratik yolu:
-      // Backend Create metodu FlowDesignDto dönüyor. Buna DesignId alanı eklemek en temizidir.
-      // Ama eklemediysek; update işlemi için backend tarafında flowId'ye ihtiyacımız var.
-      // Geçici çözüm: İlk create'den sonra ID'yi manuel set edemiyorsak, 
-      // kullanıcıya "Kaydedildi" deyip ID'yi bir şekilde almamız lazım.
-      // *Backend'de FlowDesignDto'ya 'Id' alanı eklemeni şiddetle öneririm.*
-      
-      // Şimdilik elimizdeki logic ile devam:
       setSaveMessage({ type: 'success', text: 'Başarıyla kaydedildi.' })
+      
+      // Callback çağır (Dashboard listesini güncellemek için)
+      if (onSaveSuccess) onSaveSuccess();
 
     } catch (error) {
       console.error('Kaydetme hatası:', error)
-      setSaveMessage({ type: 'error', text: 'Kaydedilemedi: ' + error.message })
+      // Axios hata mesajını yakalama yöntemi
+      const message = error.response?.data?.message || error.message;
+      setSaveMessage({ type: 'error', text: 'Kaydedilemedi: ' + message })
     } finally {
       setIsSaving(false)
       setTimeout(() => setSaveMessage(null), 3000)
     }
-  }, [edges, nodes, designName, flowId, setNodes, setEdges])
+  }, [edges, nodes, designName, flowId, setNodes, setEdges, propFlowId, onSaveSuccess])
 
-  // --- SİLME (DELETE) ---
+  // --- SİLME (DELETE - AXIOS) ---
   const handleDeleteRemote = useCallback(async () => {
     if (!flowId) return
     if (!window.confirm('Bu akışı sunucudan silmek istediğinize emin misiniz?')) return
 
     setIsSaving(true)
     try {
-      const response = await fetch(API_ROUTES.WORKFLOW.DELETE(flowId), {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) throw new Error('Silme işlemi başarısız.')
+      // 👇 DÜZELTME: fetch yerine axiosClient kullanıyoruz!
+      await axiosClient.delete(API_ROUTES.WORKFLOW.DELETE(flowId));
 
       setFlowId(null)
       setNodes([])
       setEdges([])
       setDesignName("Yeni Akış Tasarımı")
-      window.localStorage.removeItem(STORAGE_FLOW_ID_KEY)
+      
+      if(propFlowId === undefined) {
+         window.localStorage.removeItem(STORAGE_FLOW_ID_KEY)
+      }
+      
       setSaveMessage({ type: 'success', text: 'Sunucudan silindi.' })
+      
+      // Silme işleminden sonra da callback çağırılabilir veya kapatılabilir
+      if (onSaveSuccess) onSaveSuccess();
+
     } catch (error) {
       console.error('Silme hatası:', error)
       setSaveMessage({ type: 'error', text: 'Silinemedi!' })
@@ -377,8 +309,10 @@ export default function NotesFlow() {
       setIsSaving(false)
       setTimeout(() => setSaveMessage(null), 3000)
     }
-  }, [flowId, setNodes, setEdges])
+  }, [flowId, setNodes, setEdges, propFlowId, onSaveSuccess])
 
+  // ... (Render kısmı aynen kalıyor) ...
+  
   const shapeOptions = [
     { type: 'start', label: 'Kare' },
     { type: 'decision', label: 'Daire' },
@@ -399,7 +333,6 @@ export default function NotesFlow() {
     <div className="notes-flow-wrapper">
       <div className="notes-flow-toolbar">
         
-        {/* --- TASARIM ADI INPUT --- */}
         <div className="flex items-center gap-2 mr-4 border-r pr-4 border-slate-200">
              <label className="text-xs font-bold text-slate-500 uppercase">Tasarım Adı:</label>
              <input 
@@ -485,6 +418,17 @@ export default function NotesFlow() {
           >
             {isSaving ? 'İşleniyor...' : flowId ? 'Güncelle' : 'Kaydet'}
           </button>
+          
+          {/* Modal Kapatma Butonu */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-2 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
+            >
+              Kapat
+            </button>
+          )}
         </div>
         {activeNodeId && (
           <div className="notes-flow-label-editor">
