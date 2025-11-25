@@ -5,7 +5,7 @@ import NotesFlow from '../Notes/NotesFlow'
 
 // Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
-import { API_ROUTES, TOKEN_KEY } from '../../config/apiConfig'
+import { API_ROUTES, STORAGE_FLOW_ID_KEY, TOKEN_KEY } from '../../config/apiConfig'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -78,6 +78,8 @@ function Dashboard() {
     { id: 1, ad: 'İzin Talep Süreci', tarih: '20.11.2024', durum: 'Devam Ediyor' },
     { id: 2, ad: 'Masraf Bildirimi', tarih: '18.11.2024', durum: 'Tamamlandı' }
   ]
+  const gelenKutusu = []
+  const taleplerim = []
 
   return (
     <div className="min-h-screen bg-slate-50">

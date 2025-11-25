@@ -17,10 +17,14 @@ import StepNode from './Step/StepNode'
 import StepEdge from './Step/StepEdge'
 import './NotesFlow.css'
 
-// 👇 Axios Client'ı kullanıyoruz (Token'ı bu ekliyor)
-import axiosClient from '../../config/axiosClient'; 
-import { API_ROUTES } from '../../config/apiConfig';
+// 👇 DÜZELTME BURADA: Klasör yapısına göre 2 değil 3 üst dizine çıkmamız gerekiyor olabilir
+// veya src/config klasörünün yeri değişmiş olabilir.
+// Varsayım: src/components/Notes/NotesFlow.jsx -> src/config/axiosClient.js
+// Bu durumda ../../../config/axiosClient doğru yol olur.
+import axiosClient from '../../config/axiosClient'
+import { API_ROUTES } from '../../config/apiConfig'
 
+// Storage ID'sini config dosyasından da alabilirsin, burada da tanımlayabilirsin.
 const STORAGE_FLOW_ID_KEY = 'notes-flow-id'
 
 const nodeTypes = {
@@ -46,7 +50,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
   const [selectedNodeIds, setSelectedNodeIds] = useState([])
   const [activeNodeId, setActiveNodeId] = useState(null)
   const [labelEditorValue, setLabelEditorValue] = useState('')
-  // Prop flowId varsa onunla başlat, yoksa null
   const [flowId, setFlowId] = useState(propFlowId || null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState(null)
@@ -67,7 +70,7 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
     return counts
   }, [])
 
-  // --- VERİ YÜKLEME (READ - AXIOS) ---
+  // --- VERİ YÜKLEME ---
   useEffect(() => {
     const loadFlowDesign = async () => {
       let targetId = propFlowId;
@@ -77,7 +80,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
          targetId = window.localStorage.getItem(STORAGE_FLOW_ID_KEY)
       }
 
-      // Yeni Kayıt Modu (targetId null ise)
       if (!targetId) {
         setFlowId(null);
         setNodes([]);
@@ -87,17 +89,15 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
         return;
       }
 
-      // Düzenleme Modu
       setFlowId(targetId);
 
       try {
-        // Axios ile GET isteği
         const response = await axiosClient.get(API_ROUTES.WORKFLOW.GET_BY_ID(targetId));
         const data = response.data;
         
         if (data.nodes) setNodes(data.nodes)
         if (data.edges) setEdges(data.edges)
-        if (data.designName) setDesignName(data.designName); // Backend ismini desteklerse
+        if (data.designName) setDesignName(data.designName);
 
         if (data.nodes) {
             const counts = computeCountsFromNodes(data.nodes);
@@ -107,7 +107,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
       } catch (error) {
         console.error("Yükleme hatası:", error);
         if (error.response && error.response.status === 404) {
-             // Sadece local modda ise temizle
              if(propFlowId === undefined) {
                 window.localStorage.removeItem(STORAGE_FLOW_ID_KEY);
              }
@@ -119,7 +118,7 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
     }
 
     loadFlowDesign();
-  }, [propFlowId, computeCountsFromNodes, setNodes, setEdges]) // propFlowId eklendi
+  }, [propFlowId, computeCountsFromNodes, setNodes, setEdges])
 
   const onConnect = useCallback(
     (params) =>
@@ -217,7 +216,7 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
       setNodes((nds) => nds.map((node) => node.id === activeNodeId ? { ...node, data: { ...node.data, label: value } } : node))
     }, [activeNodeId, setNodes])
 
-  // --- KAYDETME (SAVE - AXIOS) ---
+  // --- KAYDETME ---
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     setSaveMessage(null)
@@ -239,24 +238,21 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
 
     try {
       let url = API_ROUTES.WORKFLOW.CREATE;
-      let axiosMethod = axiosClient.post; // Varsayılan POST (Create)
+      let axiosMethod = axiosClient.post; 
 
       if (flowId) {
         url = API_ROUTES.WORKFLOW.UPDATE(flowId);
-        axiosMethod = axiosClient.put; // Update ise PUT
+        axiosMethod = axiosClient.put;
       }
 
-      // 👇 DÜZELTME: fetch yerine axiosClient kullanıyoruz!
       const response = await axiosMethod(url, payload);
       const result = response.data;
 
       if(result.nodes) setNodes(result.nodes)
       if(result.edges) setEdges(result.edges)
       
-      // İlk kayıtsa ve backend ID döndüyse ID'yi sakla
       if (!flowId && result.id) {
          setFlowId(result.id);
-         // Sadece prop yoksa localstorage kullan
          if (propFlowId === undefined) {
             window.localStorage.setItem(STORAGE_FLOW_ID_KEY, result.id);
          }
@@ -264,12 +260,10 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
       
       setSaveMessage({ type: 'success', text: 'Başarıyla kaydedildi.' })
       
-      // Callback çağır (Dashboard listesini güncellemek için)
       if (onSaveSuccess) onSaveSuccess();
 
     } catch (error) {
       console.error('Kaydetme hatası:', error)
-      // Axios hata mesajını yakalama yöntemi
       const message = error.response?.data?.message || error.message;
       setSaveMessage({ type: 'error', text: 'Kaydedilemedi: ' + message })
     } finally {
@@ -278,14 +272,13 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
     }
   }, [edges, nodes, designName, flowId, setNodes, setEdges, propFlowId, onSaveSuccess])
 
-  // --- SİLME (DELETE - AXIOS) ---
+  // --- SİLME ---
   const handleDeleteRemote = useCallback(async () => {
     if (!flowId) return
     if (!window.confirm('Bu akışı sunucudan silmek istediğinize emin misiniz?')) return
 
     setIsSaving(true)
     try {
-      // 👇 DÜZELTME: fetch yerine axiosClient kullanıyoruz!
       await axiosClient.delete(API_ROUTES.WORKFLOW.DELETE(flowId));
 
       setFlowId(null)
@@ -299,7 +292,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
       
       setSaveMessage({ type: 'success', text: 'Sunucudan silindi.' })
       
-      // Silme işleminden sonra da callback çağırılabilir veya kapatılabilir
       if (onSaveSuccess) onSaveSuccess();
 
     } catch (error) {
@@ -311,8 +303,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
     }
   }, [flowId, setNodes, setEdges, propFlowId, onSaveSuccess])
 
-  // ... (Render kısmı aynen kalıyor) ...
-  
   const shapeOptions = [
     { type: 'start', label: 'Kare' },
     { type: 'decision', label: 'Daire' },
@@ -396,6 +386,18 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
           >
             Seçili Şekli Sil
           </button>
+          
+          {/* Modal içindeyken kapatma butonu */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+            >
+              Kapat
+            </button>
+          )}
+
           {flowId && (
             <button
               type="button"
@@ -418,17 +420,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
           >
             {isSaving ? 'İşleniyor...' : flowId ? 'Güncelle' : 'Kaydet'}
           </button>
-          
-          {/* Modal Kapatma Butonu */}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-2 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium"
-            >
-              Kapat
-            </button>
-          )}
         </div>
         {activeNodeId && (
           <div className="notes-flow-label-editor">
