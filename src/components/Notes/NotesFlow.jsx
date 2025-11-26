@@ -17,14 +17,9 @@ import StepNode from './Step/StepNode'
 import StepEdge from './Step/StepEdge'
 import './NotesFlow.css'
 
-// 👇 DÜZELTME BURADA: Klasör yapısına göre 2 değil 3 üst dizine çıkmamız gerekiyor olabilir
-// veya src/config klasörünün yeri değişmiş olabilir.
-// Varsayım: src/components/Notes/NotesFlow.jsx -> src/config/axiosClient.js
-// Bu durumda ../../../config/axiosClient doğru yol olur.
 import axiosClient from '../../config/axiosClient'
 import { API_ROUTES } from '../../config/apiConfig'
 
-// Storage ID'sini config dosyasından da alabilirsin, burada da tanımlayabilirsin.
 const STORAGE_FLOW_ID_KEY = 'notes-flow-id'
 
 const nodeTypes = {
@@ -75,7 +70,6 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
     const loadFlowDesign = async () => {
       let targetId = propFlowId;
       
-      // Eğer component prop olmadan çalışıyorsa (eski sayfa mantığı)
       if (propFlowId === undefined) {
          targetId = window.localStorage.getItem(STORAGE_FLOW_ID_KEY)
       }
@@ -304,9 +298,9 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
   }, [flowId, setNodes, setEdges, propFlowId, onSaveSuccess])
 
   const shapeOptions = [
-    { type: 'start', label: 'Kare' },
-    { type: 'decision', label: 'Daire' },
-    { type: 'step', label: 'Üçgen' },
+    { type: 'start', label: 'Başlangıç' },
+    { type: 'decision', label: 'Karar' },
+    { type: 'step', label: 'Adım' },
   ]
 
   const renderShapePreview = (type) => (
@@ -321,124 +315,129 @@ export default function NotesFlow({ flowId: propFlowId, onClose, onSaveSuccess }
 
   return (
     <div className="notes-flow-wrapper">
-      <div className="notes-flow-toolbar">
-        
-        <div className="flex items-center gap-2 mr-4 border-r pr-4 border-slate-200">
-             <label className="text-xs font-bold text-slate-500 uppercase">Tasarım Adı:</label>
-             <input 
-                type="text" 
-                value={designName} 
-                onChange={(e) => setDesignName(e.target.value)}
-                className="px-2 py-1 text-sm border rounded border-slate-300 focus:border-blue-500 outline-none"
-             />
-             {flowId && <span className="text-xs text-slate-400">ID: {flowId}</span>}
+      {/* 1. HEADER KISMI: Genel İşlemler */}
+      <div className="notes-flow-header">
+        <div className="notes-flow-header__left">
+          {onClose && (
+            <button 
+              onClick={onClose} 
+              className="notes-flow-header__back-btn" 
+              title="Kapat / Geri Dön"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            </button>
+          )}
+          <input 
+            type="text" 
+            value={designName} 
+            onChange={(e) => setDesignName(e.target.value)}
+            className="notes-flow-header__title-input"
+            placeholder="Tasarım Adı Giriniz"
+          />
+          {flowId && <span className="text-xs text-slate-400 font-mono">#{flowId}</span>}
         </div>
 
-        <div className="notes-flow-toolbar__group">
-          {shapeOptions.map((option) => (
-            <button
-              key={option.type}
-              type="button"
-              onClick={() => handleSelectType(option.type)}
-              className={`notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${
-                selectedNodeType === option.type
-                  ? 'bg-blue-600 text-white border-blue-600 shadow'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                {renderShapePreview(option.type)}
-                {option.label}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="notes-flow-toolbar__actions">
+        <div className="notes-flow-header__right">
           {saveMessage && (
-            <span
-              className={`text-sm px-3 py-1 rounded font-medium ${
-                saveMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}
-            >
+            <span className={`text-sm px-3 py-1 rounded font-medium ${
+                saveMessage.type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+              }`}>
               {saveMessage.text}
             </span>
           )}
-          <button
-            type="button"
-            onClick={toggleConnectionMode}
-            className={`notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${
-              connectionMode
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow'
-                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            {connectionMode ? 'Bağlantı Modu Aktif' : 'Bağlantı Oluştur'}
-          </button>
-          <button
-            type="button"
-            onClick={handleDeleteSelected}
-            disabled={selectedNodeIds.length === 0}
-            className={`notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${
-              selectedNodeIds.length === 0
-                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
-            }`}
-          >
-            Seçili Şekli Sil
-          </button>
           
-          {/* Modal içindeyken kapatma butonu */}
-          {onClose && (
+          {flowId && (
             <button
-              type="button"
-              onClick={onClose}
-              className="notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+              onClick={handleDeleteRemote}
+              disabled={isSaving}
+              className="notes-flow-tool-btn text-red-600 hover:bg-red-50 border-transparent"
+              title="Bu tasarımı tamamen sil"
             >
-              Kapat
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              <span className="hidden sm:inline">Sil</span>
             </button>
           )}
 
-          {flowId && (
-            <button
-              type="button"
-              onClick={handleDeleteRemote}
-              disabled={isSaving}
-              className="notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
-            >
-              Sunucudan Sil
-            </button>
-          )}
           <button
-            type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className={`notes-flow-toolbar__button px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${
-              isSaving
-                ? 'bg-emerald-100 text-emerald-700 border-emerald-200 cursor-wait'
-                : 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600 shadow'
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
+                isSaving ? 'bg-slate-100 text-slate-400 cursor-wait' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
             }`}
           >
-            {isSaving ? 'İşleniyor...' : flowId ? 'Güncelle' : 'Kaydet'}
+            {isSaving ? (
+                <>
+                 <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                 <span>Kaydediliyor...</span>
+                </>
+            ) : (
+                <>
+                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                 <span>{flowId ? 'Güncelle' : 'Kaydet'}</span>
+                </>
+            )}
           </button>
         </div>
+      </div>
+
+      {/* 2. ARAÇ ÇUBUĞU: Çizim İşlemleri */}
+      <div className="notes-flow-tools">
+        {/* Şekil Ekleme Grubu */}
+        <div className="notes-flow-tool-group">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-2 hidden sm:inline">Şekiller</span>
+            {shapeOptions.map((option) => (
+                <button
+                key={option.type}
+                type="button"
+                onClick={() => handleSelectType(option.type)}
+                className={`notes-flow-tool-btn ${selectedNodeType === option.type ? 'notes-flow-tool-btn--active' : ''}`}
+                title={`${option.label} Ekle`}
+                >
+                {renderShapePreview(option.type)}
+                <span className="hidden sm:inline">{option.label}</span>
+                </button>
+            ))}
+        </div>
+
+        {/* Bağlantı Grubu */}
+        <div className="notes-flow-tool-group">
+            <button
+                type="button"
+                onClick={toggleConnectionMode}
+                className={`notes-flow-tool-btn ${connectionMode ? 'notes-flow-tool-btn--active' : ''}`}
+                title="Bağlantı Modunu Aç/Kapat"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span className="hidden sm:inline">{connectionMode ? 'Bağlantı Aktif' : 'Bağla'}</span>
+            </button>
+        </div>
+
+        {/* Düzenleme Grubu */}
+        <div className="notes-flow-tool-group">
+             <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={selectedNodeIds.length === 0}
+                className="notes-flow-tool-btn text-slate-600 hover:text-red-600"
+                title="Seçili elemanları sil"
+             >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+             </button>
+        </div>
+
+        {/* Etiket Editörü (Dinamik) */}
         {activeNodeId && (
-          <div className="notes-flow-label-editor">
-            <label className="notes-flow-label-editor__label" htmlFor="notes-flow-label-input">
-              Etiket
-            </label>
-            <input
-              id="notes-flow-label-input"
-              type="text"
-              value={labelEditorValue}
-              onChange={handleLabelInputChange}
-              className="notes-flow-label-editor__input"
-              placeholder="Düğüm etiketi"
-            />
-          </div>
+            <div className="notes-flow-label-editor">
+                <span>Etiket:</span>
+                <input
+                    type="text"
+                    value={labelEditorValue}
+                    onChange={handleLabelInputChange}
+                    placeholder="Etiket yaz..."
+                    autoFocus
+                />
+            </div>
         )}
-        <span className="notes-flow-toolbar__info">
-          Şekil eklemek için tür seçip tıklayın. Bağlantı için moda geçin.
-        </span>
       </div>
 
       <ReactFlow

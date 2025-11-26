@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import LeaveRequestModal from '../LeaveRequestModal/LeaveRequestModal'
 import NotesFlow from '../Notes/NotesFlow'
 
-// Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
 import { API_ROUTES, STORAGE_FLOW_ID_KEY, TOKEN_KEY } from '../../config/apiConfig'
 
