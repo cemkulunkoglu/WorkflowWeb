@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_ROUTES, TOKEN_KEY, USER_KEY } from '../../../config/apiConfig'
+import '../auth.css'
 
 function Login({ onSwitchToRegister }) {
   const [email, setEmail] = useState('') // Username yerine Email kullanıyoruz (Backend öyle istiyor)

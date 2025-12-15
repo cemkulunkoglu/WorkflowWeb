@@ -185,3 +185,45 @@
   border-right: 6px solid transparent;
   border-bottom: 12px solid #f97316;
 }
+
+/* --- Mobil Uyumluluk --- */
+@media (max-width: 640px) {
+  .notes-flow-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .notes-flow-header__left {
+    width: 100%;
+  }
+
+  .notes-flow-header__title-input {
+    font-size: 1.1rem;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .notes-flow-header__right {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .notes-flow-tools {
+    padding: 0.5rem 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .notes-flow-tool-group {
+    padding-right: 0.75rem;
+  }
+
+  .notes-flow-label-editor {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+}

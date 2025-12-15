@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { API_ROUTES } from '../../../config/apiConfig'
+import '../auth.css'
 
 function Register({ onSwitchToLogin }) {
   // Backend DTO'su ile uyumlu form yapısı

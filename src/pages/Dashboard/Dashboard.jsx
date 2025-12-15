@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import LeaveRequestModal from '../LeaveRequestModal/LeaveRequestModal'
-import NotesFlow from '../Notes/NotesFlow'
+import LeaveRequestModal from '../../components/LeaveRequestModal/LeaveRequestModal'
+import NotesFlow from '../../components/Notes/NotesFlow'
 
 // Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
-import { API_ROUTES, STORAGE_FLOW_ID_KEY, TOKEN_KEY } from '../../config/apiConfig'
+import { API_ROUTES, STORAGE_FLOW_ID_KEY, TOKEN_KEY, USER_KEY } from '../../config/apiConfig'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -21,7 +21,9 @@ function Dashboard() {
   const [selectedFlowId, setSelectedFlowId] = useState(null)
 
   // Kullanıcı bilgisini al
-  const user = JSON.parse(localStorage.getItem('user_info') || '{}')
+  const storedUser =
+    localStorage.getItem(USER_KEY) || localStorage.getItem('user_info') || '{}';
+  const user = JSON.parse(storedUser || '{}');
 
   // --- BACKEND İŞLEMLERİ ---
 
@@ -69,6 +71,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     localStorage.removeItem('user_info');
     navigate('/');
   }
@@ -86,17 +89,20 @@ function Dashboard() {
       {/* Üst Navbar */}
       <nav className="bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center py-3 sm:py-0 sm:h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-slate-800">İş Akışı Yönetimi</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-800">İş Akışı Yönetimi</h1>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-slate-600">
-                Hoş geldiniz, <span className="font-semibold text-slate-800">{user.fullName || 'Kullanıcı'}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span className="text-xs sm:text-sm text-slate-600">
+                Hoş geldiniz,{' '}
+                <span className="font-semibold text-slate-800">
+                  {user.fullName || 'Kullanıcı'}
+                </span>
               </span>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors duration-200 text-sm font-medium"
+                className="px-3 py-2 text-xs sm:text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors duration-200 font-medium self-start sm:self-auto"
               >
                 Çıkış Yap
               </button>
@@ -105,14 +111,17 @@ function Dashboard() {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Tab Menü */}
         <div className="mb-8">
-          <div className="border-b border-slate-200">
-            <nav className="flex gap-8" aria-label="Tabs">
+          <div className="border-b border-slate-200 -mx-3 sm:mx-0">
+            <nav
+              className="flex gap-4 sm:gap-8 overflow-x-auto px-3 sm:px-0"
+              aria-label="Tabs"
+            >
               <button
                 onClick={() => setActiveTab('surecler')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
                   activeTab === 'surecler' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
@@ -120,7 +129,7 @@ function Dashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('gelen-kutusu')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
                   activeTab === 'gelen-kutusu' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
@@ -128,7 +137,7 @@ function Dashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('taleplerim')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
                   activeTab === 'taleplerim' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
@@ -136,7 +145,7 @@ function Dashboard() {
               </button>
               <button
                 onClick={() => setActiveTab('flow-design')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
                   activeTab === 'flow-design' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
@@ -147,27 +156,32 @@ function Dashboard() {
         </div>
 
         {/* İçerik Alanı */}
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 min-h-[400px]">
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[320px] sm:min-h-[400px]">
           
           {/* 1. TAB: Süreçler */}
           {activeTab === 'surecler' && (
             <div>
               <div className="mb-6">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">Süreçler</h2>
-                <p className="text-sm text-slate-600">Aktif iş akışı süreçleriniz</p>
+                <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Süreçler</h2>
+                <p className="text-xs sm:text-sm text-slate-600">Aktif iş akışı süreçleriniz</p>
               </div>
               {surecler.length === 0 ? (
                 <p className="text-slate-500 text-center py-8">Henüz süreç bulunmamaktadır.</p>
               ) : (
                 <div className="space-y-4">
                   {surecler.map((surec) => (
-                    <div key={surec.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                      <div className="flex justify-between items-start">
+                    <div
+                      key={surec.id}
+                      className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
                         <div>
-                          <h3 className="font-semibold text-slate-800 mb-1">{surec.ad}</h3>
-                          <p className="text-sm text-slate-600">Tarih: {surec.tarih}</p>
+                          <h3 className="font-semibold text-slate-800 mb-1 text-sm sm:text-base">
+                            {surec.ad}
+                          </h3>
+                          <p className="text-xs sm:text-sm text-slate-600">Tarih: {surec.tarih}</p>
                         </div>
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        <span className="inline-flex self-start sm:self-auto px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                           {surec.durum}
                         </span>
                       </div>
@@ -186,14 +200,14 @@ function Dashboard() {
           {/* 3. TAB: Taleplerim */}
           {activeTab === 'taleplerim' && (
             <div>
-              <div className="mb-6 flex justify-between items-center">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800 mb-2">Taleplerim</h2>
-                  <p className="text-sm text-slate-600">Oluşturduğunuz talepler</p>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Taleplerim</h2>
+                  <p className="text-xs sm:text-sm text-slate-600">Oluşturduğunuz talepler</p>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
+                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 self-start sm:self-auto"
                 >
                   Yeni Talep
                 </button>
@@ -205,16 +219,16 @@ function Dashboard() {
           {/* 4. TAB: Akış Tasarımı */}
           {activeTab === 'flow-design' && (
             <div>
-              <div className="mb-6 flex justify-between items-center">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800 mb-2">Akış Tasarımlarım</h2>
-                  <p className="text-sm text-slate-600">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Akış Tasarımlarım</h2>
+                  <p className="text-xs sm:text-sm text-slate-600">
                     Kayıtlı tasarımlarınızı düzenleyin veya yeni oluşturun.
                   </p>
                 </div>
                 <button
                   onClick={handleCreateNewFlow}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2 self-start sm:self-auto"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   Yeni Tasarım
