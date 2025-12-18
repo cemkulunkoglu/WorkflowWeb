@@ -24,36 +24,29 @@
   padding: 0 12px;
   text-align: center;
   font-size: 14px;
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .notes-shape__text {
   display: block;
   color: inherit;
   font-weight: inherit;
+  text-align: center;
+  width: 100%;
 }
 
 .notes-shape--step {
   position: relative;
-  width: 120px;
-  height: 110px;
+  width: 140px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 12px;
+  background-color: #f97316; /* turuncu kare */
 }
 
 .notes-shape--step::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 60px solid transparent;
-  border-right: 60px solid transparent;
-  border-bottom: 110px solid #f97316;
+  content: none;
 }
 
 .notes-shape--step .notes-shape__text {
@@ -62,8 +55,6 @@
   font-weight: 700;
   font-size: 14px;
   text-align: center;
-  width: 90px;
-  text-transform: none;
-  letter-spacing: normal;
+  width: 100%;
 }
 

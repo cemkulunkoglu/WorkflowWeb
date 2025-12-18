@@ -178,11 +178,10 @@
 }
 .shape-preview--start { background-color: #22c55e; border: 2px solid #16a34a; }
 .shape-preview--decision { background-color: #3b82f6; border: 2px solid #2563eb; border-radius: 50%; }
-.shape-preview--step { 
-  background-color: transparent;
-  width: 0; height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
+.shape-preview--step {
+  background-color: #f97316; /* turuncu kare */
+  border: 2px solid #ea580c;
+  border-radius: 4px;
 }
 
 /* --- Mobil Uyumluluk --- */

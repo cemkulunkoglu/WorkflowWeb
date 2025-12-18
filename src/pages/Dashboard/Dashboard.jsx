@@ -268,7 +268,6 @@ function Dashboard() {
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                         </div>
-                        <span className="text-xs font-mono bg-slate-100 text-slate-500 px-2 py-1 rounded">ID: {design.id}</span>
                       </div>
                       <h3 className="font-bold text-slate-800 text-lg mb-1 group-hover:text-blue-600 transition-colors">
                         {design.designName || 'İsimsiz Tasarım'}
