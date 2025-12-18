@@ -41,6 +41,7 @@ function Login({ onSwitchToRegister }) {
       
       // 4. Token'ı ve Kullanıcı bilgilerini sakla
       localStorage.setItem(TOKEN_KEY, data.token)
+      localStorage.setItem('token', data.token) // Employee tree için beklenen key
       localStorage.setItem(USER_KEY, JSON.stringify({
           userId: data.userId,
           email: data.email,

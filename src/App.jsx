@@ -72,6 +72,7 @@ function App() {
             } 
           />
 
+
           <Route 
             path="/editor/:id" 
             element={

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import LeaveRequestModal from '../../components/LeaveRequestModal/LeaveRequestModal'
 import NotesFlow from '../../components/Notes/NotesFlow'
+import EmployeesOrgChartFlow from '../../components/EmployeeTree/EmployeesOrgChartFlow'
 
 // Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
@@ -71,6 +72,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('token');
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem('user_info');
     navigate('/');
@@ -150,6 +152,16 @@ function Dashboard() {
                 }`}
               >
                 Akış Tasarımı
+              </button>
+              <button
+                onClick={() => setActiveTab('org-chart')}
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
+                  activeTab === 'org-chart'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                Çalışan Hiyerarşisi
               </button>
             </nav>
           </div>
@@ -266,6 +278,13 @@ function Dashboard() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 5. TAB: Çalışan Hiyerarşisi */}
+          {activeTab === 'org-chart' && (
+            <div className="h-full">
+              <EmployeesOrgChartFlow />
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { TOKEN_KEY } from './apiConfig';
 
 const axiosClient = axios.create({
+  baseURL: 'https://localhost:7071',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -10,10 +11,17 @@ const axiosClient = axios.create({
 // 🟢 REQUEST INTERCEPTOR (İstek Araya Giren)
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const primaryToken = localStorage.getItem(TOKEN_KEY);
+    const fallbackToken =
+      primaryToken ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('jwt');
+
+    if (fallbackToken) {
+      config.headers.Authorization = `Bearer ${fallbackToken}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
