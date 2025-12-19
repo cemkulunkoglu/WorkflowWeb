@@ -1,17 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ChatMessageBubble from './ChatMessageBubble';
 import { initialChatMessages } from './chatSeed';
 import { generateMessageId } from './chatUtils';
 import './ChatWidget.css';
 
-const TABS = {
-  HUMAN: 'human',
-  AI: 'ai',
-};
+const CHAT_MODE = 'ai';
 
 function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(TABS.HUMAN);
   const [messages, setMessages] = useState(initialChatMessages);
   const [inputValue, setInputValue] = useState('');
   const [panelHeight, setPanelHeight] = useState(384); // px, varsayılan yükseklik
@@ -19,24 +15,15 @@ function ChatWidget() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  const filteredMessages = useMemo(
-    () => messages.filter((m) => m.mode === activeTab),
-    [messages, activeTab]
-  );
-
   useEffect(() => {
     if (!isOpen) return;
     if (!messagesEndRef.current) return;
 
     messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [filteredMessages, isOpen]);
+  }, [messages, isOpen]);
 
   const handleToggleOpen = () => {
     setIsOpen((prev) => !prev);
-  };
-
-  const handleChangeTab = (tabKey) => {
-    setActiveTab(tabKey);
   };
 
   const handleSendMessage = () => {
@@ -45,7 +32,7 @@ function ChatWidget() {
 
     const newMessage = {
       id: generateMessageId(),
-      mode: activeTab,
+      mode: CHAT_MODE,
       sender: 'me',
       text: trimmed,
       createdAt: new Date().toISOString(),
@@ -103,12 +90,10 @@ function ChatWidget() {
   };
 
   const badgeText =
-    activeTab === TABS.HUMAN ? 'Yetkili aktif' : 'AI hazır';
+    'AI hazır';
 
   const badgeColorClasses =
-    activeTab === TABS.HUMAN
-      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-      : 'bg-indigo-100 text-indigo-700 border-indigo-200';
+    'bg-indigo-100 text-indigo-700 border-indigo-200';
 
   return (
     <>
@@ -141,7 +126,7 @@ function ChatWidget() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Hızlı sorularınız için mini destek alanı.
+                  Yapay zeka asistanı ile hızlıca sohbet edin.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -173,37 +158,9 @@ function ChatWidget() {
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="px-3 pt-2 pb-1 border-b border-slate-200 bg-white/90">
-              <div className="inline-flex rounded-full p-1 bg-slate-100">
-                <button
-                  type="button"
-                  onClick={() => handleChangeTab(TABS.HUMAN)}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all
-                    ${activeTab === TABS.HUMAN
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                >
-                  Yetkili
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleChangeTab(TABS.AI)}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all
-                    ${activeTab === TABS.AI
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                >
-                  Yapay Zeka
-                </button>
-              </div>
-            </div>
-
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-3 py-2 bg-white/80 chat-scroll">
-              {filteredMessages.length === 0 ? (
+              {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center">
                   <p className="text-xs text-slate-400 text-center">
                     Henüz mesaj yok, yazmaya başla.
@@ -211,7 +168,7 @@ function ChatWidget() {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {filteredMessages.map((message) => (
+                  {messages.map((message) => (
                     <ChatMessageBubble key={message.id} message={message} />
                   ))}
                   <div ref={messagesEndRef} />
@@ -229,11 +186,7 @@ function ChatWidget() {
                     onChange={handleInputChange}
                     onKeyDown={handleInputKeyDown}
                     ref={inputRef}
-                    placeholder={
-                      activeTab === TABS.HUMAN
-                        ? 'Yetkiliye mesaj yaz...'
-                        : 'Yapay Zeka\'ya mesaj yaz...'
-                    }
+                    placeholder="Yapay Zeka'ya mesaj yaz..."
                     className="w-full resize-none overflow-y-auto chat-scroll text-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
