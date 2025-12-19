@@ -1,8 +1,9 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { ReactFlow, Background, Controls, Handle, Position, MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import useEmployeeTree from './useEmployeeTree';
+import { getDetail, updateEmployee, deleteEmployee } from '../../services/employeeApi';
 
 function EmployeeCardNode({ data }) {
   const { employee, isMatched, isSelected } = data || {};
@@ -48,6 +49,22 @@ function EmployeeCardNode({ data }) {
 const nodeTypes = {
   employeeCard: EmployeeCardNode,
 };
+
+function flattenEmployees(tree) {
+  const result = [];
+
+  const walk = (nodes) => {
+    nodes.forEach((node) => {
+      result.push(node);
+      if (Array.isArray(node.children) && node.children.length > 0) {
+        walk(node.children);
+      }
+    });
+  };
+
+  walk(tree || []);
+  return result;
+}
 
 function buildGraph(tree, matchedIds, selectedNodeId) {
   const nodes = [];
@@ -159,6 +176,62 @@ function EmployeesOrgChartFlow() {
     managerId: '',
   });
 
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    sicilNo: '',
+    jobTitle: '',
+    department: '',
+    managerId: '',
+    userId: '',
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState(null);
+
+  // Başarı mesajını bir süre sonra otomatik gizle
+  useEffect(() => {
+    if (!feedbackMessage) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedbackMessage(null);
+    }, 4000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedbackMessage]);
+
+  const allEmployees = useMemo(() => flattenEmployees(tree), [tree]);
+
+  const detailHierarchy = useMemo(() => {
+    if (!detail || !detail.path) return [];
+
+    const ids = detail.path
+      .split('/')
+      .filter(Boolean)
+      .map((p) => Number(p))
+      .filter((n) => Number.isFinite(n));
+
+    if (!ids.length) return [];
+
+    // Ör: /5/6/17/ -> [17, 6, 5] (seçili çalışan en üstte)
+    return ids
+      .map((id) => {
+        const emp = allEmployees.find((e) => e.employeeId === id);
+        return {
+          id,
+          name: emp?.fullName || `ID ${id}`,
+        };
+      })
+      .reverse();
+  }, [detail, allEmployees]);
+
   const { nodes, edges } = useMemo(
     () => buildGraph(tree || [], matchedIds, selectedNodeId),
     [tree, matchedIds, selectedNodeId]
@@ -191,6 +264,181 @@ function EmployeesOrgChartFlow() {
       department: '',
       managerId: selectedNodeId ? String(selectedNodeId) : '',
     });
+  };
+
+  // Detay verisini seçili employee için çek
+  useEffect(() => {
+    if (!selectedNodeId) {
+      setDetail(null);
+      setDetailError(null);
+      setIsEditing(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchDetail = async () => {
+      setDetailLoading(true);
+      setDetailError(null);
+      try {
+        const data = await getDetail(selectedNodeId);
+        if (isCancelled) return;
+        setDetail(data);
+        setIsEditing(false);
+      } catch (err) {
+        if (isCancelled) return;
+        const status = err?.response?.status;
+        const backendMessage =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message;
+
+        if (status === 401) {
+          setDetailError('Oturum süresi doldu, tekrar giriş yapın.');
+        } else {
+          setDetailError(
+            backendMessage ||
+              `Çalışan detayı alınırken bir hata oluştu${
+                status ? ` (HTTP ${status})` : ''
+              }.`
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setDetailLoading(false);
+        }
+      }
+    };
+
+    fetchDetail();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedNodeId]);
+
+  const handleStartEdit = () => {
+    if (!detail) return;
+    const parts = (detail.fullName || '').trim().split(/\s+/);
+    const firstName = parts.shift() || '';
+    const lastName = parts.join(' ');
+
+    setEditForm({
+      firstName,
+      lastName,
+      phone: detail.phone || '',
+      sicilNo: detail.sicilNo || '',
+      jobTitle: detail.jobTitle || '',
+      department: detail.department || '',
+      managerId:
+        detail.managerId === null || typeof detail.managerId === 'undefined'
+          ? ''
+          : String(detail.managerId),
+      userId:
+        detail.userId === null || typeof detail.userId === 'undefined'
+          ? ''
+          : String(detail.userId),
+    });
+    setFeedbackMessage(null);
+    setIsEditing(true);
+  };
+
+  const handleEditChange = (event) => {
+    const { name, value } = event.target;
+    setEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditSubmit = async (event) => {
+    event.preventDefault();
+    if (!selectedNodeId) return;
+
+    setEditSaving(true);
+    setFeedbackMessage(null);
+    setDetailError(null);
+
+    const payload = {
+      userId:
+        editForm.userId === '' || editForm.userId === null
+          ? null
+          : Number(editForm.userId),
+      firstName: editForm.firstName.trim(),
+      lastName: editForm.lastName.trim(),
+      phone: editForm.phone.trim() || null,
+      sicilNo: editForm.sicilNo.trim() || null,
+      jobTitle: editForm.jobTitle.trim() || null,
+      department: editForm.department.trim() || null,
+      managerId:
+        editForm.managerId === '' || editForm.managerId === null
+          ? null
+          : Number(editForm.managerId),
+    };
+
+    try {
+      await updateEmployee(selectedNodeId, payload);
+      setFeedbackMessage('Çalışan bilgileri başarıyla güncellendi.');
+      // Detayı ve ağacı tekrar çek
+      const refreshed = await getDetail(selectedNodeId);
+      setDetail(refreshed);
+      setIsEditing(false);
+      refetch();
+    } catch (err) {
+      const status = err?.response?.status;
+      const backendMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message;
+
+      if (status === 401) {
+        setDetailError('Oturum süresi doldu, tekrar giriş yapın.');
+      } else {
+        setDetailError(
+          backendMessage ||
+            'Çalışan güncellenirken bir hata oluştu. Lütfen tekrar deneyin.'
+        );
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedNodeId) return;
+    // Basit confirm; istersen sonra custom modal yapabiliriz
+    // eslint-disable-next-line no-alert
+    const ok = window.confirm(
+      'Bu çalışan ve tüm alt çalışanları silinecek. Emin misiniz?'
+    );
+    if (!ok) return;
+
+    setDeleteLoading(true);
+    setDetailError(null);
+    setFeedbackMessage(null);
+
+    try {
+      await deleteEmployee(selectedNodeId);
+      setFeedbackMessage('Çalışan ve alt çalışanları silindi.');
+      // Seçimi temizle
+      selectNode(null);
+      setDetail(null);
+      refetch();
+    } catch (err) {
+      const status = err?.response?.status;
+      const backendMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message;
+
+      if (status === 401) {
+        setDetailError('Oturum süresi doldu, tekrar giriş yapın.');
+      } else {
+        setDetailError(
+          backendMessage ||
+            'Çalışan silinirken bir hata oluştu. Lütfen tekrar deneyin.'
+        );
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const handleFormChange = (event) => {
@@ -339,14 +587,50 @@ function EmployeesOrgChartFlow() {
           </p>
         )}
 
-        {selectedNode && (
-          <div className="space-y-2 text-xs text-slate-700">
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                Ad Soyad
+        {detailLoading && selectedNode && (
+          <div className="mt-2 text-xs text-slate-500">Detaylar yükleniyor…</div>
+        )}
+
+        {detailError && (
+          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700">
+            {detailError}
+          </div>
+        )}
+
+        {feedbackMessage && !detailError && (
+          <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-700">
+            {feedbackMessage}
+          </div>
+        )}
+
+        {selectedNode && detail && !isEditing && (
+          <div className="mt-2 space-y-2 text-xs text-slate-700">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                  Ad Soyad
+                </div>
+                <div className="font-semibold text-slate-900">
+                  {detail.fullName}
+                </div>
               </div>
-              <div className="font-semibold text-slate-900">
-                {selectedNode.fullName}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleStartEdit}
+                  disabled={detailLoading || deleteLoading}
+                  className="rounded-md bg-blue-600 px-3 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                >
+                  Düzenle
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={detailLoading || deleteLoading}
+                  className="rounded-md bg-red-600 px-3 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+                >
+                  {deleteLoading ? 'Siliniyor…' : 'Sil'}
+                </button>
               </div>
             </div>
 
@@ -355,13 +639,28 @@ function EmployeesOrgChartFlow() {
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">
                   Ünvan
                 </div>
-                <div>{selectedNode.jobTitle}</div>
+                <div>{detail.jobTitle || '-'}</div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">
                   Departman
                 </div>
-                <div>{selectedNode.department}</div>
+                <div>{detail.department || '-'}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                  Telefon
+                </div>
+                <div>{detail.phone || '-'}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                  Sicil No
+                </div>
+                <div>{detail.sicilNo || '-'}</div>
               </div>
             </div>
 
@@ -370,31 +669,189 @@ function EmployeesOrgChartFlow() {
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">
                   Çalışan ID
                 </div>
-                <div>{selectedNode.employeeId}</div>
+                <div>{detail.employeeId}</div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">
                   Yöneticisi (ManagerId)
                 </div>
                 <div>
-                  {selectedNode.managerId != null
-                    ? selectedNode.managerId
+                  {detail.managerId !== null && typeof detail.managerId !== 'undefined'
+                    ? detail.managerId
                     : '-'}
                 </div>
               </div>
             </div>
 
-            {selectedNode.path && (
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                  Path
+                  Kullanıcı ID (userId)
                 </div>
-                <div className="break-all text-[11px] text-slate-600">
-                  {selectedNode.path}
+                <div>
+                  {detail.userId !== null && typeof detail.userId !== 'undefined'
+                    ? detail.userId
+                    : '-'}
                 </div>
               </div>
-            )}
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-400">
+                  Hiyerarşik Durumu
+                </div>
+                {detailHierarchy.length === 0 ? (
+                  <div className="text-[11px] text-slate-500">-</div>
+                ) : (
+                  <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                    {detailHierarchy.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-1"
+                      >
+                        <span className="font-medium">
+                          {item.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+        )}
+
+        {selectedNode && detail && isEditing && (
+          <form
+            onSubmit={handleEditSubmit}
+            className="mt-2 space-y-3 text-xs text-slate-700"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Ad
+                </label>
+                <input
+                  name="firstName"
+                  value={editForm.firstName}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Soyad
+                </label>
+                <input
+                  name="lastName"
+                  value={editForm.lastName}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Telefon
+                </label>
+                <input
+                  name="phone"
+                  value={editForm.phone}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Sicil No
+                </label>
+                <input
+                  name="sicilNo"
+                  value={editForm.sicilNo}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Ünvan
+                </label>
+                <input
+                  name="jobTitle"
+                  value={editForm.jobTitle}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Departman
+                </label>
+                <input
+                  name="department"
+                  value={editForm.department}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Manager ID
+                </label>
+                  <select
+                  name="managerId"
+                  value={editForm.managerId}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Yönetici yok</option>
+                  {allEmployees.map((emp) => (
+                    <option key={emp.employeeId} value={emp.employeeId}>
+                      {emp.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-700">
+                  Kullanıcı ID (userId)
+                </label>
+                <input
+                  name="userId"
+                  value={editForm.userId}
+                  onChange={handleEditChange}
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setFeedbackMessage(null);
+                }}
+                disabled={editSaving}
+                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed"
+              >
+                İptal
+              </button>
+              <button
+                type="submit"
+                disabled={editSaving}
+                className="rounded-md bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+              >
+                {editSaving ? 'Kaydediliyor…' : 'Kaydet'}
+              </button>
+            </div>
+          </form>
         )}
       </aside>
 
@@ -473,19 +930,11 @@ function EmployeesOrgChartFlow() {
                   onChange={handleFormChange}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Yönetici yok (root seviye)</option>
-                  {tree.map((root) => (
-                    <React.Fragment key={root.employeeId}>
-                      <option value={root.employeeId}>
-                        {root.fullName} (ID: {root.employeeId})
-                      </option>
-                      {Array.isArray(root.children) &&
-                        root.children.map((child) => (
-                          <option key={child.employeeId} value={child.employeeId}>
-                            └ {child.fullName} (ID: {child.employeeId})
-                          </option>
-                        ))}
-                    </React.Fragment>
+                  <option value="">Yönetici yok</option>
+                  {allEmployees.map((emp) => (
+                    <option key={emp.employeeId} value={emp.employeeId}>
+                      {emp.fullName}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -502,7 +951,7 @@ function EmployeesOrgChartFlow() {
                   type="submit"
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                 >
-                  Kaydet (Local)
+                  Kaydet
                 </button>
               </div>
             </form>

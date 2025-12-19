@@ -112,7 +112,11 @@ function ChatWidget() {
 
   return (
     <>
-      <div className="fixed bottom-3 right-3 z-50">
+      <div
+        className={`fixed bottom-3 right-3 ${
+          isOpen ? 'z-50 pointer-events-auto' : 'z-0 pointer-events-none'
+        }`}
+      >
         {/* Panel */}
         <div
           className={`origin-bottom-right mb-14 w-80 sm:w-96 transform transition-all duration-200 ease-out

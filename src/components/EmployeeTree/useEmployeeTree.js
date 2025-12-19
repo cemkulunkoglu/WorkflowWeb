@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import axiosClient from '../../config/axiosClient';
-
-const EMPLOYEE_TREE_URL = '/api/employees/tree';
+import { getTree, createEmployee as apiCreateEmployee } from '../../services/employeeApi';
 
 // Basit tip dokümantasyonu
 // type EmployeeNode = {
@@ -28,8 +26,8 @@ function useEmployeeTree() {
     setError(null);
 
     try {
-      const response = await axiosClient.get(EMPLOYEE_TREE_URL);
-      const safeData = Array.isArray(response.data) ? response.data : [];
+      const data = await getTree();
+      const safeData = Array.isArray(data) ? data : [];
 
       setTree(safeData);
 
@@ -37,7 +35,6 @@ function useEmployeeTree() {
       const rootIds = safeData.map((n) => n.employeeId);
       setExpandedIds(new Set(rootIds));
     } catch (err) {
-      // Axios hata formatı
       const status = err?.response?.status;
       const backendMessage =
         err?.response?.data?.message ||
@@ -173,8 +170,8 @@ function useEmployeeTree() {
           sicilNo: null,
         };
 
-        const response = await axiosClient.post('/api/employees', payload);
-        return response.data;
+        const data = await apiCreateEmployee(payload);
+        return data;
       } catch (err) {
         // 401 vs diğer hatalar komponentte beslensin diye aynen fırlatıyoruz
         throw err;

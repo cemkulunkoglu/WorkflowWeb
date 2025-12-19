@@ -23,8 +23,24 @@ function Dashboard() {
 
   // Kullanıcı bilgisini al
   const storedUser =
-    localStorage.getItem(USER_KEY) || localStorage.getItem('user_info') || '{}';
-  const user = JSON.parse(storedUser || '{}');
+    localStorage.getItem(USER_KEY) || localStorage.getItem('user_info') || '{}'
+  const user = JSON.parse(storedUser || '{}')
+
+  const isFullNameSameAsEmail =
+    user.fullName && user.email && user.fullName === user.email
+
+  let displayName = 'Kullanıcı'
+
+  if (user.fullName && !isFullNameSameAsEmail) {
+    displayName = user.fullName
+  } else if (user.email === 'admin@sirket.com') {
+    // Admin için özel gösterim
+    displayName = 'Sistem Yöneticisi'
+  } else if (user.full_name || user.name || user.displayName) {
+    displayName = user.full_name || user.name || user.displayName
+  } else if (user.email) {
+    displayName = user.email
+  }
 
   // --- BACKEND İŞLEMLERİ ---
 
@@ -99,7 +115,7 @@ function Dashboard() {
               <span className="text-xs sm:text-sm text-slate-600">
                 Hoş geldiniz,{' '}
                 <span className="font-semibold text-slate-800">
-                  {user.fullName || 'Kullanıcı'}
+                  {displayName}
                 </span>
               </span>
               <button
