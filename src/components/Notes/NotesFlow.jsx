@@ -36,6 +36,8 @@ const normalizeEdges = (apiEdges = []) =>
     type: "step",
     label: e.label || "",
     data: { label: e.label || "" },
+    // Var olan tüm bağlantılara da ok ucu ekleyelim
+    markerEnd: { type: MarkerType.ArrowClosed, color: "#1d4ed8" },
   }));
 
 const edgeTypes = {
@@ -692,6 +694,11 @@ export default function NotesFlow({
         <Controls />
         <Background variant="lines" gap={18} size={1} color="#dbeafe" />
       </ReactFlow>
+
+      {/* Ok yönü için küçük açıklama */}
+      <div className="mt-2 text-[11px] text-slate-400">
+        Bağlantı yönü: çizgiyi başlattığınız düğümden (kaynak) bıraktığınız düğüme (hedef) doğru okunur.
+      </div>
     </div>
   );
 }
