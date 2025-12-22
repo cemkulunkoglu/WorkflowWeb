@@ -4,6 +4,11 @@ import ChatMessageBubble, { getMessageId } from "./ChatMessageBubble";
 const STREAM_URL = "https://localhost:7299/stream";
 const SEND_URL = "https://localhost:7299/api/chat/send";
 
+function makeLocalMessageId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return `local-${crypto.randomUUID()}`;
+  return `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -12,8 +17,8 @@ export default function ChatWidget() {
   const [connected, setConnected] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState("");
-  const [sendInfo, setSendInfo] = useState("");
   const [sseError, setSseError] = useState("");
+  const [aiTyping, setAiTyping] = useState(false);
   const [eventCount, setEventCount] = useState(0); // accepted (global + messageId + non-dup)
   const [rawEventCount, setRawEventCount] = useState(0); // parsed JSON events
   const [ignoredNonGlobalCount, setIgnoredNonGlobalCount] = useState(0);
@@ -47,6 +52,28 @@ export default function ChatWidget() {
     if (!lastRawEventAt) return "—";
     return new Date(lastRawEventAt).toLocaleTimeString("tr-TR");
   }, [lastRawEventAt]);
+
+  const reconcileOptimisticUser = (prev, incoming) => {
+    // Backend aynı user mesajını SSE ile döndüğünde optimistic mesajı replace et.
+    const incomingSender = incoming?.senderType ?? incoming?.SenderType;
+    if (incomingSender !== "User") return prev;
+    const incomingThread = incoming?.threadId ?? incoming?.ThreadId;
+    if (incomingThread !== "global") return prev;
+    const incomingText = String(incoming?.text ?? incoming?.Text ?? "").trim();
+    if (!incomingText) return prev;
+
+    const idx = prev.findIndex(
+      (m) =>
+        m?.__localPending &&
+        (m?.senderType ?? m?.SenderType) === "User" &&
+        (m?.threadId ?? m?.ThreadId) === "global" &&
+        String(m?.text ?? m?.Text ?? "").trim() === incomingText
+    );
+    if (idx === -1) return prev;
+    const next = prev.slice();
+    next[idx] = incoming;
+    return next;
+  };
 
   const scrollToBottom = () => {
     const el = listRef.current;
@@ -102,7 +129,8 @@ export default function ChatWidget() {
       if (esRef.current === es) esRef.current = null;
 
       const attempt = (reconnectAttemptRef.current += 1);
-      const delayMs = Math.min(10_000, 1000 * 2 ** Math.min(attempt, 4)); // 1s,2s,4s,8s,10s
+      const delays = [1000, 2000, 5000, 10000];
+      const delayMs = delays[Math.min(attempt - 1, delays.length - 1)];
       reconnectTimerRef.current = window.setTimeout(() => {
         reconnectTimerRef.current = null;
         connectSse();
@@ -115,11 +143,40 @@ export default function ChatWidget() {
 
         console.log("📥 SSE message:", msg);
 
+        const threadId = msg?.threadId ?? msg?.ThreadId;
+        const messageId = msg?.MessageId ?? msg?.messageId ?? getMessageId(msg);
+        const senderType = msg?.senderType ?? msg?.SenderType;
+
         setRawEventCount((c) => c + 1);
         setLastRawEventAt(Date.now());
-        setLastThreadSeen(String(msg?.threadId ?? ""));
+        setLastThreadSeen(String(threadId ?? ""));
 
-        setMessages((prev) => [...prev, msg]);
+        if (threadId !== "global") {
+          setIgnoredNonGlobalCount((c) => c + 1);
+          return;
+        }
+
+        if (!messageId) {
+          setIgnoredNoMessageIdCount((c) => c + 1);
+          return;
+        }
+
+        if (seenIdsRef.current.has(messageId)) {
+          setDuplicateCount((c) => c + 1);
+          return;
+        }
+        seenIdsRef.current.add(messageId);
+
+        if (senderType && senderType !== "User") {
+          // AI cevabı geldi -> typing indicator kapansın
+          setAiTyping(false);
+        }
+
+        setMessages((prev) => {
+          const reconciled = reconcileOptimisticUser(prev, msg);
+          if (reconciled !== prev) return reconciled;
+          return [...prev, msg];
+        });
         setEventCount((c) => c + 1);
         setLastEventAt(Date.now());
         requestAnimationFrame(scrollToBottom);
@@ -191,9 +248,22 @@ export default function ChatWidget() {
     if (!trimmed) return;
     if (!token) return;
 
+    // Optimistic UI: user mesajını anında göster
+    const optimistic = {
+      MessageId: makeLocalMessageId(),
+      threadId: "global",
+      senderType: "User",
+      text: trimmed,
+      createdAtUtc: new Date().toISOString(),
+      __localPending: true,
+    };
+    seenIdsRef.current.add(optimistic.MessageId);
+    setMessages((prev) => [...prev, optimistic]);
+    requestAnimationFrame(scrollToBottom);
+    setAiTyping(true);
+
     setIsSending(true);
     setSendError("");
-    setSendInfo("");
     try {
       const res = await fetch(SEND_URL, {
         method: "POST",
@@ -210,13 +280,15 @@ export default function ChatWidget() {
 
       if (!res.ok) {
         setSendError(`Mesaj gönderilemedi (HTTP ${res.status}).`);
+        setAiTyping(false);
         return;
       }
 
-      // ÖNEMLİ: Listeyi sadece SSE’den besliyoruz (duplicate olmaması için).
+      // NOT: response ile listeye eklemiyoruz (duplicate olur)
       setInputText("");
     } catch (err) {
       setSendError("Mesaj gönderilirken ağ hatası oluştu.");
+      setAiTyping(false);
     } finally {
       setIsSending(false);
     }
@@ -264,7 +336,6 @@ export default function ChatWidget() {
             <div className="chatw-error">JWT yok: Mesaj gönderme kapalı. (localStorage: "token")</div>
           ) : null}
           {sendError ? <div className="chatw-error">{sendError}</div> : null}
-          {sendInfo ? <div className="chatw-error">{sendInfo}</div> : null}
           {!connected ? (
             <div className="chatw-error">
               SSE bağlı değilse mesajlar görünmez. `https://localhost:7299/swagger` açıp sertifikayı kabul ettiğinizden
@@ -280,6 +351,19 @@ export default function ChatWidget() {
                 <ChatMessageBubble key={msg?.MessageId ?? msg?.messageId ?? getMessageId(msg)} message={msg} />
               ))
             )}
+
+            {aiTyping ? (
+              <div className="chatw-row ai">
+                <div className="chatw-bubble ai chatw-typing">
+                  <span>AI yazıyor</span>
+                  <span className="chatw-typing-dots" aria-hidden="true">
+                    <span className="chatw-typing-dot" />
+                    <span className="chatw-typing-dot" />
+                    <span className="chatw-typing-dot" />
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="chatw-footer">
