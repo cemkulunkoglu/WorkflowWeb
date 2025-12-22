@@ -43,3 +43,290 @@
   }
 }
 
+/* --- ChatWidget (SSE) --- */
+.chatw-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+}
+.chatw-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+  filter: brightness(1.03);
+}
+.chatw-btn:active {
+  transform: translateY(0px);
+}
+.chatw-btn-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+.chatw-btn-text {
+  font-size: 14px;
+}
+
+.chatw-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 72px;
+  z-index: 60;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  height: 460px;
+  max-height: calc(100vh - 120px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: chatw-pop 160ms ease-out;
+}
+@keyframes chatw-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .chatw-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    bottom: 72px;
+    height: min(520px, calc(100vh - 120px));
+  }
+}
+
+.chatw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 12px 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.85);
+}
+.chatw-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chatw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chatw-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.95);
+}
+.chatw-dot.ok {
+  background: rgba(34, 197, 94, 0.95);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+.chatw-dot.warn {
+  background: rgba(234, 179, 8, 0.95);
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.18);
+}
+.chatw-dot.err {
+  background: rgba(239, 68, 68, 0.95);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+.chatw-subtitle {
+  font-size: 11px;
+  color: rgb(100, 116, 139); /* slate-500 */
+  margin-top: 2px;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chatw-pill {
+  font-size: 11px;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(226, 232, 240, 0.6);
+  color: rgb(51, 65, 85);
+}
+.chatw-pill.ok {
+  background: rgba(220, 252, 231, 0.8);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: rgb(21, 128, 61);
+}
+.chatw-pill.warn {
+  background: rgba(254, 249, 195, 0.9);
+  border-color: rgba(234, 179, 8, 0.35);
+  color: rgb(161, 98, 7);
+}
+.chatw-pill.err {
+  background: rgba(254, 226, 226, 0.9);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: rgb(185, 28, 28);
+}
+.chatw-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(71, 85, 105);
+}
+.chatw-close:hover {
+  background: rgba(226, 232, 240, 0.7);
+}
+
+.chatw-error {
+  margin: 10px 12px 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(254, 226, 226, 0.9);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: rgb(153, 27, 27);
+  font-size: 12px;
+}
+
+.chatw-messages {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 10px 8px 10px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.8), rgba(255, 255, 255, 1));
+}
+.chatw-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(148, 163, 184);
+  font-size: 12px;
+}
+
+.chatw-row {
+  display: flex;
+  margin: 6px 0;
+}
+.chatw-row.ai {
+  justify-content: flex-start;
+}
+.chatw-row.user {
+  justify-content: flex-end;
+}
+.chatw-bubble {
+  max-width: 78%;
+  border-radius: 14px;
+  padding: 9px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+.chatw-bubble.ai {
+  background: rgba(255, 255, 255, 0.95);
+  color: rgb(15, 23, 42);
+}
+.chatw-bubble.user {
+  background: rgba(219, 234, 254, 0.95);
+  color: rgb(15, 23, 42);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+.chatw-text {
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chatw-time {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgb(100, 116, 139);
+}
+.chatw-row.user .chatw-time {
+  text-align: right;
+}
+
+.chatw-footer {
+  padding: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 252, 0.9);
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.chatw-input {
+  flex: 1;
+  resize: none;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.25rem;
+  outline: none;
+  background: rgba(255, 255, 255, 0.95);
+}
+.chatw-input:focus {
+  border-color: rgba(37, 99, 235, 0.65);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.chatw-send {
+  border-radius: 12px;
+  padding: 9px 12px;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+  transition: transform 140ms ease, filter 140ms ease;
+}
+.chatw-send:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+}
+.chatw-send:disabled {
+  background: rgba(148, 163, 184, 0.9);
+  color: rgba(15, 23, 42, 0.5);
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
+.chatw-send-icon {
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.95;
+}
+.chatw-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-top-color: rgba(255, 255, 255, 1);
+  animation: chatw-spin 650ms linear infinite;
+}
+@keyframes chatw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

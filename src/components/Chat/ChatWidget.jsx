@@ -1,288 +1,320 @@
-import React, { useEffect, useRef, useState } from 'react';
-import ChatMessageBubble from './ChatMessageBubble';
-import { initialChatMessages } from './chatSeed';
-import { generateMessageId } from './chatUtils';
-import './ChatWidget.css';
+import { useEffect, useMemo, useRef, useState } from "react";
+import ChatMessageBubble, { getMessageId } from "./ChatMessageBubble";
 
-const CHAT_MODE = 'ai';
+const STREAM_URL = "https://localhost:7299/stream";
+const SEND_URL = "https://localhost:7299/api/chat/send";
 
-function ChatWidget() {
+export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState(initialChatMessages);
-  const [inputValue, setInputValue] = useState('');
-  const [panelHeight, setPanelHeight] = useState(384); // px, varsayılan yükseklik
+  const [messages, setMessages] = useState([]);
+  const seenIdsRef = useRef(new Set());
+  const [inputText, setInputText] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const [sendInfo, setSendInfo] = useState("");
+  const [sseError, setSseError] = useState("");
+  const [eventCount, setEventCount] = useState(0); // accepted (global + messageId + non-dup)
+  const [rawEventCount, setRawEventCount] = useState(0); // parsed JSON events
+  const [ignoredNonGlobalCount, setIgnoredNonGlobalCount] = useState(0);
+  const [ignoredNoMessageIdCount, setIgnoredNoMessageIdCount] = useState(0);
+  const [duplicateCount, setDuplicateCount] = useState(0);
+  const [lastEventAt, setLastEventAt] = useState(null);
+  const [lastRawEventAt, setLastRawEventAt] = useState(null);
+  const [lastThreadSeen, setLastThreadSeen] = useState("");
 
-  const messagesEndRef = useRef(null);
+  const esRef = useRef(null);
+  const listRef = useRef(null);
   const inputRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const reconnectAttemptRef = useRef(0);
+
+  // Token login'den sonra değişebileceği için "bir kere" okumuyoruz.
+  const token = localStorage.getItem("token") || "";
+  const canSend = Boolean(token);
+
+  const statusText = useMemo(() => {
+    if (!isOpen) return "Kapalı";
+    return connected ? "Connected" : "Disconnected";
+  }, [isOpen, connected]);
+
+  const lastEventText = useMemo(() => {
+    if (!lastEventAt) return "—";
+    return new Date(lastEventAt).toLocaleTimeString("tr-TR");
+  }, [lastEventAt]);
+
+  const lastRawEventText = useMemo(() => {
+    if (!lastRawEventAt) return "—";
+    return new Date(lastRawEventAt).toLocaleTimeString("tr-TR");
+  }, [lastRawEventAt]);
+
+  const scrollToBottom = () => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  };
 
   useEffect(() => {
     if (!isOpen) return;
-    if (!messagesEndRef.current) return;
+    scrollToBottom();
+    // panel açılınca input'a odaklan
+    const t = window.setTimeout(() => inputRef.current?.focus(), 50);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
-    messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  useEffect(() => {
+    if (!isOpen) return;
+    scrollToBottom();
   }, [messages, isOpen]);
 
-  const handleToggleOpen = () => {
-    setIsOpen((prev) => !prev);
+  const connectSse = () => {
+    if (!isOpen) return;
+    if (esRef.current) return; // StrictMode/double effect guard
+
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+
+    setConnected(false);
+    setSseError("");
+
+    const es = new EventSource(STREAM_URL);
+    esRef.current = es;
+
+    es.onopen = () => {
+      reconnectAttemptRef.current = 0;
+      setConnected(true);
+      setSseError("");
+    };
+
+    es.onerror = () => {
+      setConnected(false);
+      setSseError("Disconnected");
+
+      // yeniden bağlanmayı biz yönetelim
+      try {
+        es.close();
+      } catch {
+        // ignore
+      }
+      if (esRef.current === es) esRef.current = null;
+
+      const attempt = (reconnectAttemptRef.current += 1);
+      const delayMs = Math.min(10_000, 1000 * 2 ** Math.min(attempt, 4)); // 1s,2s,4s,8s,10s
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null;
+        connectSse();
+      }, delayMs);
+    };
+
+    const onMessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+
+        console.log("📥 SSE message:", msg);
+
+        setRawEventCount((c) => c + 1);
+        setLastRawEventAt(Date.now());
+        setLastThreadSeen(String(msg?.threadId ?? ""));
+
+        setMessages((prev) => [...prev, msg]);
+        setEventCount((c) => c + 1);
+        setLastEventAt(Date.now());
+        requestAnimationFrame(scrollToBottom);
+      } catch (err) {
+        console.error("SSE parse error", err, e.data);
+      }
+    };
+
+    es.addEventListener("message", onMessage);
+
+    // cleanup handler'ı effect'te olacak, burada değil
+    es.__onMessage = onMessage;
   };
 
-  const handleSendMessage = () => {
-    const trimmed = inputValue.trim();
+  useEffect(() => {
+    if (!isOpen) {
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      setConnected(false);
+      return;
+    }
+
+    connectSse();
+
+    return () => {
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+
+      const es = esRef.current;
+      if (es) {
+        try {
+          if (es.__onMessage) es.removeEventListener("message", es.__onMessage);
+        } catch {
+          // ignore
+        }
+        try {
+          es.close();
+        } catch {
+          // ignore
+        }
+        esRef.current = null;
+      }
+      setConnected(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
+
+  const handleToggle = () => setIsOpen((v) => !v);
+
+  const handleSend = async () => {
+    const trimmed = inputText.trim();
     if (!trimmed) return;
+    if (!token) return;
 
-    const newMessage = {
-      id: generateMessageId(),
-      mode: CHAT_MODE,
-      sender: 'me',
-      text: trimmed,
-      createdAt: new Date().toISOString(),
-    };
+    setIsSending(true);
+    setSendError("");
+    setSendInfo("");
+    try {
+      const res = await fetch(SEND_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          threadId: "global",
+          senderType: "User",
+          text: trimmed,
+        }),
+      });
 
-    setMessages((prev) => [...prev, newMessage]);
-    setInputValue('');
+      if (!res.ok) {
+        setSendError(`Mesaj gönderilemedi (HTTP ${res.status}).`);
+        return;
+      }
 
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
+      // ÖNEMLİ: Listeyi sadece SSE’den besliyoruz (duplicate olmaması için).
+      setInputText("");
+    } catch (err) {
+      setSendError("Mesaj gönderilirken ağ hatası oluştu.");
+    } finally {
+      setIsSending(false);
     }
   };
 
-  const handleInputKeyDown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      handleSendMessage();
+  const onInputKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
-
-  const handleInputChange = (event) => {
-    const el = event.target;
-    setInputValue(el.value);
-
-    if (!el) return;
-    el.style.height = 'auto';
-    const maxHeight = 96; // ~3-4 satır
-    const nextHeight = Math.min(el.scrollHeight, maxHeight);
-    el.style.height = `${nextHeight}px`;
-  };
-
-  const handleHeaderMouseDown = (event) => {
-    // Sadece sol tık ve butonların üzerinde değilken çalışsın
-    if (event.button !== 0) return;
-    if (event.target.closest && event.target.closest('button')) return;
-
-    event.preventDefault();
-
-    const startY = event.clientY;
-    const startHeight = panelHeight;
-
-    const handleMouseMove = (moveEvent) => {
-      const deltaY = startY - moveEvent.clientY; // Yukarı çekince pozitif
-      const nextHeight = Math.max(280, Math.min(560, startHeight + deltaY));
-      setPanelHeight(nextHeight);
-    };
-
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  };
-
-  const badgeText =
-    'AI hazır';
-
-  const badgeColorClasses =
-    'bg-indigo-100 text-indigo-700 border-indigo-200';
 
   return (
     <>
-      <div
-        className={`fixed bottom-3 right-3 ${
-          isOpen ? 'z-50 pointer-events-auto' : 'z-0 pointer-events-none'
-        }`}
-      >
-        {/* Panel */}
-        <div
-          className={`origin-bottom-right mb-14 w-80 sm:w-96 transform transition-all duration-200 ease-out
-            ${isOpen
-              ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
-              : 'opacity-0 translate-y-3 scale-95 pointer-events-none'
-            }`}
-        >
-          <div
-            className="rounded-2xl shadow-2xl bg-white border border-slate-200 backdrop-blur-sm overflow-hidden flex flex-col"
-            style={{ height: panelHeight }}
-          >
-            {/* Header */}
-            <div
-              className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 cursor-ns-resize select-none"
-              onMouseDown={handleHeaderMouseDown}
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-slate-900">
-                    Workflow Chat
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Yapay zeka asistanı ile hızlıca sohbet edin.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${badgeColorClasses}`}
-                >
-                  {badgeText}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleToggleOpen}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
-                  aria-label="Mini chat panelini kapat"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M6 6L14 14M14 6L6 14"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
+      <button type="button" className="chatw-btn" onClick={handleToggle} aria-label="Chat aç/kapat">
+        <span className="chatw-btn-icon" aria-hidden="true">
+          💬
+        </span>
+        <span className="chatw-btn-text">Chat</span>
+      </button>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto px-3 py-2 bg-white/80 chat-scroll">
-              {messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
-                  <p className="text-xs text-slate-400 text-center">
-                    Henüz mesaj yok, yazmaya başla.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {messages.map((message) => (
-                    <ChatMessageBubble key={message.id} message={message} />
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-slate-200 bg-slate-50/90 px-3 py-2">
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <textarea
-                    rows={1}
-                    value={inputValue}
-                    onChange={handleInputChange}
-                    onKeyDown={handleInputKeyDown}
-                    ref={inputRef}
-                    placeholder="Yapay Zeka'ya mesaj yaz..."
-                    className="w-full resize-none overflow-y-auto chat-scroll text-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      {isOpen ? (
+        <div className="chatw-panel" role="dialog" aria-label="Chat paneli">
+          <div className="chatw-header">
+            <div className="chatw-title">
+              <div className="chatw-title-row">
+                <strong>AIChat</strong>
+                <span className="chatw-status">
+                  <span
+                    className={`chatw-dot ${connected ? "ok" : "err"}`}
+                    aria-hidden="true"
                   />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSendMessage}
-                  disabled={!inputValue.trim()}
-                  className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-semibold shadow-md transition-all
-                    ${inputValue.trim()
-                      ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
-                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                    }`}
-                  aria-label="Mesaj gönder"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M4 4L20 12L4 20L8 12L4 4Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M4 4L12 12L4 20"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+                  <span className={`chatw-pill ${connected ? "ok" : "err"}`}>
+                    {statusText}
+                  </span>
+                </span>
               </div>
-              <p className="mt-1 text-[10px] text-slate-400">
-                Enter: gönder • Shift+Enter: yeni satır
-              </p>
             </div>
+            <button type="button" className="chatw-close" onClick={handleToggle} aria-label="Kapat">
+              ✕
+            </button>
+          </div>
+
+          {!token ? (
+            <div className="chatw-error">JWT yok: Mesaj gönderme kapalı. (localStorage: "token")</div>
+          ) : null}
+          {sendError ? <div className="chatw-error">{sendError}</div> : null}
+          {sendInfo ? <div className="chatw-error">{sendInfo}</div> : null}
+          {!connected ? (
+            <div className="chatw-error">
+              SSE bağlı değilse mesajlar görünmez. `https://localhost:7299/swagger` açıp sertifikayı kabul ettiğinizden
+              emin olun ve backend’in çalıştığını kontrol edin.
+            </div>
+          ) : null}
+
+          <div className="chatw-messages chat-scroll" ref={listRef}>
+            {messages.length === 0 ? (
+              <div className="chatw-empty">Henüz mesaj yok.</div>
+            ) : (
+              messages.map((msg) => (
+                <ChatMessageBubble key={msg?.MessageId ?? msg?.messageId ?? getMessageId(msg)} message={msg} />
+              ))
+            )}
+          </div>
+
+          <div className="chatw-footer">
+            <textarea
+              className="chatw-input"
+              placeholder="Mesaj yaz…"
+              rows={2}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={onInputKeyDown}
+              ref={inputRef}
+              disabled={!token}
+            />
+            <button
+              type="button"
+              className="chatw-send"
+              onClick={handleSend}
+              disabled={!inputText.trim() || isSending || !canSend}
+            >
+              {isSending ? (
+                <span className="chatw-spinner" aria-label="Gönderiliyor" />
+              ) : (
+                <>
+                  <span className="chatw-send-text">Gönder</span>
+                  <span className="chatw-send-icon" aria-hidden="true">
+                    ➤
+                  </span>
+                </>
+              )}
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Floating Button */}
-      <button
-        type="button"
-        onClick={handleToggleOpen}
-        className="fixed bottom-3 right-2 z-50 w-12 h-12 rounded-full bg-blue-600 text-white shadow-xl flex items-center justify-center text-xl font-semibold hover:bg-blue-700 transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        aria-label="Mini chat panelini aç/kapat"
-      >
-        {isOpen ? (
-          <svg
-            className="w-5 h-5"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M6 6L14 14M14 6L6 14"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-        ) : (
-          <svg
-            className="w-6 h-6"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M5 5H19C20.1046 5 21 5.89543 21 7V14C21 15.1046 20.1046 16 19 16H9.5L6 19.5V16H5C3.89543 16 3 15.1046 3 14V7C3 5.89543 3.89543 5 5 5Z"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M8 9H16"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-            <path
-              d="M8 12H13"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-          </svg>
-        )}
-      </button>
+      ) : null}
     </>
   );
 }
-
-export default ChatWidget;
 
 

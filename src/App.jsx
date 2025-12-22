@@ -5,7 +5,7 @@ import Register from './pages/Auth/Register/Register'
 import Dashboard from './pages/Dashboard/Dashboard'
 import NotesFlow from './components/Notes/NotesFlow'
 import { TOKEN_KEY } from './config/apiConfig'
-import ChatWidget from './components/Chat/ChatWidget'
+import ChatWidget from './components/chat/ChatWidget'
 
 // 🛡️ Güvenlik Bileşeni
 const RequireAuth = ({ children }) => {

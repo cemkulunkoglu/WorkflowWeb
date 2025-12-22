@@ -1,32 +1,43 @@
-import React from 'react';
-import { formatMessageTime } from './chatUtils';
+import React from "react";
 
-function ChatMessageBubble({ message }) {
-  const isMe = message.sender === 'me';
+function formatTrDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("tr-TR");
+}
+
+// Backend MessageId "mükemmel key" olduğu için önce onu kullanıyoruz.
+export function getMessageId(msg) {
+  return msg?.MessageId || msg?.messageId || msg?.messageID || msg?.MessageID || msg?.id || "";
+}
+
+export default function ChatMessageBubble({ message }) {
+  // Yeni format: senderType (User/AI)
+  // Eski/alternatif formatlara da tolerans gösterelim (sender: 'me')
+  const senderType = message?.senderType ?? message?.SenderType;
+  const isUser =
+    senderType === "User" ||
+    message?.sender === "me" ||
+    message?.sender === "user";
+
+  const side = isUser ? "user" : "ai";
+  const text = message?.text ?? message?.Text ?? "";
+  const createdAtUtc =
+    message?.createdAtUtc ??
+    message?.CreatedAtUtc ??
+    message?.createdAt ??
+    message?.CreatedAt ??
+    "";
 
   return (
-    <div className={`flex mb-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm border 
-          ${isMe
-            ? 'bg-blue-600 text-white border-blue-500'
-            : 'bg-slate-100 text-slate-900 border-slate-200'
-          }`}
-      >
-        <div className="whitespace-pre-wrap break-words">
-          {message.text}
-        </div>
-        <div
-          className={`mt-1 text-[10px] flex items-center gap-1 
-            ${isMe ? 'text-blue-100' : 'text-slate-400'}`}
-        >
-          <span>{formatMessageTime(message.createdAt)}</span>
-        </div>
+    <div className={`chatw-row ${side}`}>
+      <div className={`chatw-bubble ${side}`}>
+        <div className="chatw-text">{text}</div>
+        {createdAtUtc ? <div className="chatw-time">{formatTrDate(createdAtUtc)}</div> : null}
       </div>
     </div>
   );
 }
-
-export default ChatMessageBubble;
 
 
