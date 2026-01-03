@@ -1,33 +1,12 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import Login from './pages/Auth/Login/Login'
 import Register from './pages/Auth/Register/Register'
 import Dashboard from './pages/Dashboard/Dashboard'
 import NotesFlow from './components/Notes/NotesFlow'
-import { TOKEN_KEY } from './config/apiConfig'
+import ChangePassword from './pages/Auth/ChangePassword/ChangePassword'
 import ChatWidget from './components/chat/ChatWidget'
-
-// 🛡️ Güvenlik Bileşeni
-const RequireAuth = ({ children }) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  const location = useLocation();
-
-  if (!token) {
-    return <Navigate to="/" state={{ from: location }} replace />;
-  }
-  return children;
-};
-
-// 🔄 Giriş Yapmış Kullanıcıyı Login Ekranından Uzak Tutma Bileşeni
-const RedirectIfAuthenticated = ({ children }) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  
-  if (token) {
-    // Eğer token varsa, Login veya Register sayfasına girmesin, Dashboard'a gitsin
-    return <Navigate to="/dashboard" replace />;
-  }
-  return children;
-};
+import { ChangePasswordGate, VerifiedRoute } from './auth/RouteGuards'
 
 function App() {
   const [showRegister, setShowRegister] = useState(false)
@@ -48,50 +27,34 @@ function App() {
     <BrowserRouter>
       <div className="relative min-h-screen">
         <Routes>
-          {/* PUBLIC ROTALAR (Giriş yapmışsa Dashboard'a atar) */}
-          <Route 
-            path="/" 
+          <Route
+            path="/login"
             element={
-              <RedirectIfAuthenticated>
-                {showRegister ? (
-                  <Register onSwitchToLogin={() => setShowRegister(false)} />
-                ) : (
-                  <Login onSwitchToRegister={() => setShowRegister(true)} />
-                )}
-              </RedirectIfAuthenticated>
-            } 
+              showRegister ? (
+                <Register onSwitchToLogin={() => setShowRegister(false)} />
+              ) : (
+                <Login onSwitchToRegister={() => setShowRegister(true)} />
+              )
+            }
           />
 
-          {/* PRIVATE ROTALAR (Sadece Token'ı olan girebilir) */}
-          <Route 
-            path="/dashboard" 
-            element={
-              <RequireAuth>
-                <Dashboard />
-              </RequireAuth>
-            } 
+          <Route
+            path="/"
+            element={<Navigate to="/dashboard" replace />}
           />
 
+          <Route element={<ChangePasswordGate />}>
+            <Route path="/change-password" element={<ChangePassword />} />
+          </Route>
 
-          <Route 
-            path="/editor/:id" 
-            element={
-              <RequireAuth>
-                <NotesFlow />
-              </RequireAuth>
-            } 
-          />
-          <Route 
-            path="/editor/new" 
-            element={
-              <RequireAuth>
-                <NotesFlow />
-              </RequireAuth>
-            } 
-          />
+          <Route element={<VerifiedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/editor/:id" element={<NotesFlow />} />
+            <Route path="/editor/new" element={<NotesFlow />} />
+          </Route>
 
           {/* Hatalı URL */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
 
         <ChatWidget />

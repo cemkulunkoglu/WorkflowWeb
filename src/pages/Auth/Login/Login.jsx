@@ -1,15 +1,20 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { API_ROUTES, TOKEN_KEY, USER_KEY } from '../../../config/apiConfig'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../../auth/AuthContext'
 import '../auth.css'
 
 function Login({ onSwitchToRegister }) {
-  const [email, setEmail] = useState('') // Username yerine Email kullanıyoruz (Backend öyle istiyor)
+  const [userNameOrEmail, setUserNameOrEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState(null) // Hata mesajları için state
   const [isLoading, setIsLoading] = useState(false) // Yükleniyor durumu
   
   const navigate = useNavigate()
+  const location = useLocation()
+  const { login } = useAuth()
+
+  const flash = location.state?.message
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -17,41 +22,14 @@ function Login({ onSwitchToRegister }) {
     setIsLoading(true)
 
     try {
-      // 1. Backend'e İstek At
-      const response = await fetch(API_ROUTES.AUTH.LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-            email: email, 
-            password: password 
-        }),
-      })
+      const data = await login({ userNameOrEmail, password, rememberMe })
 
-      // 2. Hata Kontrolü
-      if (!response.ok) {
-        // Backend'den gelen hatayı okumaya çalışalım
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Giriş başarısız. Bilgilerinizi kontrol edin.')
+      if (data?.isVerified === false) {
+        navigate('/change-password', { replace: true })
+        return
       }
 
-      // 3. Başarılı Giriş
-      const data = await response.json()
-      
-      // 4. Token'ı ve Kullanıcı bilgilerini sakla
-      localStorage.setItem(TOKEN_KEY, data.token)
-      localStorage.setItem('token', data.token) // Employee tree için beklenen key
-      localStorage.setItem(USER_KEY, JSON.stringify({
-          userId: data.userId,
-          email: data.email,
-          fullName: data.fullName
-      }))
-
-      console.log('Giriş başarılı:', data.fullName)
-      
-      // 4. Yönlendir
-      navigate('/dashboard') // veya ana sayfaya '/'
+      navigate('/dashboard', { replace: true })
 
     } catch (err) {
       console.error('Login hatası:', err)
@@ -73,6 +51,12 @@ function Login({ onSwitchToRegister }) {
           <p className="text-slate-500 text-sm">Giriş Yapın</p>
         </div>
 
+        {flash && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm">
+            {flash}
+          </div>
+        )}
+
         {/* Hata Mesajı Kutusu */}
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-lg text-sm flex items-center gap-2">
@@ -87,7 +71,7 @@ function Login({ onSwitchToRegister }) {
               htmlFor="email" 
               className="block text-sm font-semibold text-slate-700 mb-2"
             >
-              Email Adresi
+              Kullanıcı adı veya Email
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -96,11 +80,11 @@ function Login({ onSwitchToRegister }) {
                 </svg>
               </div>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ornek@sirket.com"
+                id="userNameOrEmail"
+                type="text"
+                value={userNameOrEmail}
+                onChange={(e) => setUserNameOrEmail(e.target.value)}
+                placeholder="kullaniciadi veya ornek@sirket.com"
                 className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all duration-200 bg-white"
                 required
               />
@@ -131,6 +115,16 @@ function Login({ onSwitchToRegister }) {
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Beni hatırla
+          </label>
 
           <div className="pt-2 space-y-3">
             <button

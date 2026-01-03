@@ -5,6 +5,8 @@ import '@xyflow/react/dist/style.css';
 import useEmployeeTree from './useEmployeeTree';
 import { getDetail, updateEmployee, deleteEmployee, getEmployeeAncestors } from '../../services/employeeApi';
 import EmployeeAncestorsPanel from './EmployeeAncestorsPanel';
+import { useAuth } from '../../auth/AuthContext';
+import { AuthService } from '../../services/authService';
 
 function EmployeeCardNode({ data }) {
   const { employee, isMatched, isSelected } = data || {};
@@ -165,13 +167,20 @@ function EmployeesOrgChartFlow() {
     selectedNodeId,
     selectNode,
     refetch,
-    createEmployee,
   } = useEmployeeTree();
 
+  const { isAdmin } = useAuth();
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [addError, setAddError] = useState(null);
-  const [form, setForm] = useState({
-    fullName: '',
+  const [provisionError, setProvisionError] = useState(null);
+  const [provisionLoading, setProvisionLoading] = useState(false);
+  const [provisionResult, setProvisionResult] = useState(null);
+  const [provisionForm, setProvisionForm] = useState({
+    userName: '',
+    email: '',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    sicilNo: '',
     jobTitle: '',
     department: '',
     managerId: '',
@@ -258,19 +267,89 @@ function EmployeesOrgChartFlow() {
   );
 
   const openAddModal = () => {
-    setAddError(null);
+    setProvisionError(null);
+    setProvisionResult(null);
+    setProvisionForm((prev) => ({
+      ...prev,
+      managerId: selectedNodeId ? String(selectedNodeId) : prev.managerId,
+    }));
     setIsAddOpen(true);
   };
 
   const closeAddModal = () => {
     setIsAddOpen(false);
-    setAddError(null);
-    setForm({
-      fullName: '',
+    setProvisionError(null);
+    setProvisionLoading(false);
+    setProvisionResult(null);
+    setProvisionForm({
+      userName: '',
+      email: '',
+      firstName: '',
+      lastName: '',
+      phone: '',
+      sicilNo: '',
       jobTitle: '',
       department: '',
       managerId: selectedNodeId ? String(selectedNodeId) : '',
     });
+  };
+
+  const handleProvisionChange = (event) => {
+    const { name, value } = event.target;
+    setProvisionForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleProvisionSubmit = async (event) => {
+    event.preventDefault();
+    setProvisionError(null);
+    setProvisionResult(null);
+
+    if (!isAdmin) {
+      setProvisionError('Yetkin yok. Bu işlem sadece admin kullanıcılar içindir.');
+      return;
+    }
+
+    const payload = {
+      userName: provisionForm.userName.trim(),
+      email: provisionForm.email.trim(),
+      firstName: provisionForm.firstName.trim(),
+      lastName: provisionForm.lastName.trim(),
+      phone: provisionForm.phone.trim() || null,
+      sicilNo: provisionForm.sicilNo.trim() || null,
+      jobTitle: provisionForm.jobTitle.trim() || null,
+      department: provisionForm.department.trim() || null,
+      managerId:
+        provisionForm.managerId === '' ? 0 : Number(provisionForm.managerId),
+    };
+
+    if (!payload.userName || !payload.email || !payload.firstName || !payload.lastName) {
+      setProvisionError('userName, email, firstName ve lastName zorunludur.');
+      return;
+    }
+
+    setProvisionLoading(true);
+    try {
+      const res = await AuthService.provisionEmployee(payload);
+      setProvisionResult(res);
+      // Tree tarafı internal olarak oluştuğu için UI’yı güncellemek adına refetch.
+      refetch();
+      // Formu resetle (managerId kalsın)
+      setProvisionForm((prev) => ({
+        ...prev,
+        userName: '',
+        email: '',
+        firstName: '',
+        lastName: '',
+        phone: '',
+        sicilNo: '',
+        jobTitle: '',
+        department: '',
+      }));
+    } catch (err) {
+      setProvisionError(err?.message || 'Çalışan provision edilemedi.');
+    } finally {
+      setProvisionLoading(false);
+    }
   };
 
   // Detay verisini seçili employee için çek
@@ -502,46 +581,8 @@ function EmployeesOrgChartFlow() {
     }
   };
 
-  const handleFormChange = (event) => {
-    const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleAddSubmit = async (event) => {
-    event.preventDefault();
-    const trimmedName = form.fullName.trim();
-    if (!trimmedName) {
-      setAddError('Ad Soyad zorunludur.');
-      return;
-    }
-
-    try {
-      setAddError(null);
-      await createEmployee({
-        fullName: trimmedName,
-        jobTitle: form.jobTitle,
-        department: form.department,
-        managerId: form.managerId,
-      });
-      closeAddModal();
-      refetch();
-    } catch (err) {
-      const status = err?.response?.status;
-      const backendMessage =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message;
-
-      if (status === 401) {
-        setAddError('Oturum süreniz dolmuş. Lütfen yeniden giriş yapın.');
-      } else {
-        setAddError(
-          backendMessage ||
-            'Çalışan oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.'
-        );
-      }
-    }
-  };
+  // NOT: "Yeni Çalışan" artık WorkflowAPI(7071) üzerinden create etmez.
+  // Admin-only provision işlemi AuthServerAPI(7130) /api/Auth/provision-employee ile yapılır.
 
   return (
     <div className="flex flex-col gap-4 md:flex-row h-full">
@@ -937,14 +978,16 @@ function EmployeesOrgChartFlow() {
         </section>
       </aside>
 
-      {/* Yeni Çalışan Modalı */}
+      {/* Yeni Çalışan Modalı (AuthServer provision-employee) */}
       {isAddOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl border border-slate-200">
+          <div className="w-full max-w-xl rounded-xl bg-white p-5 shadow-2xl border border-slate-200">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Yeni Çalışan Ekle
-              </h3>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Yeni Çalışan Ekle
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={closeAddModal}
@@ -955,64 +998,148 @@ function EmployeesOrgChartFlow() {
               </button>
             </div>
 
-            {addError && (
+            {!isAdmin ? (
+              <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+                Yetkin yok: Bu işlem sadece admin kullanıcılar içindir.
+              </div>
+            ) : null}
+
+            {provisionError && (
               <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700">
-                {addError}
+                {provisionError}
               </div>
             )}
 
-            <form onSubmit={handleAddSubmit} className="space-y-3 text-xs">
-              <div>
-                <label className="mb-1 block font-medium text-slate-700">
-                  Ad Soyad
-                </label>
-                <input
-                  name="fullName"
-                  value={form.fullName}
-                  onChange={handleFormChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Örn: Ali Veli"
-                />
+            {provisionResult?.temporaryPassword ? (
+              <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                <div className="font-semibold">Temporary Password</div>
+                <div className="mt-1 font-mono">{provisionResult.temporaryPassword}</div>
+                <div className="mt-2 text-[11px] text-emerald-800/80">
+                  employeeId: {provisionResult.employeeId} • path: {provisionResult.path}
+                </div>
+                <button
+                  type="button"
+                  className="mt-2 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(provisionResult.temporaryPassword);
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                >
+                  Kopyala
+                </button>
               </div>
+            ) : null}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form onSubmit={handleProvisionSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block font-medium text-slate-700">
-                    Ünvan
-                  </label>
+                  <label className="mb-1 block font-medium text-slate-700">Kullanıcı Adı *</label>
                   <input
-                    name="jobTitle"
-                    value={form.jobTitle}
-                    onChange={handleFormChange}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Örn: Yazılım Geliştirici"
+                    name="userName"
+                    value={provisionForm.userName}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    required
+                    disabled={provisionLoading}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-slate-700">
-                    Departman
-                  </label>
+                  <label className="mb-1 block font-medium text-slate-700">Email *</label>
+                  <input
+                    name="email"
+                    value={provisionForm.email}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    required
+                    disabled={provisionLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block font-medium text-slate-700">Ad *</label>
+                  <input
+                    name="firstName"
+                    value={provisionForm.firstName}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    required
+                    disabled={provisionLoading}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-medium text-slate-700">Soyad *</label>
+                  <input
+                    name="lastName"
+                    value={provisionForm.lastName}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    required
+                    disabled={provisionLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block font-medium text-slate-700">Departman</label>
                   <input
                     name="department"
-                    value={form.department}
-                    onChange={handleFormChange}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Örn: IT"
+                    value={provisionForm.department}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    disabled={provisionLoading}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-medium text-slate-700">Ünvan</label>
+                  <input
+                    name="jobTitle"
+                    value={provisionForm.jobTitle}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    disabled={provisionLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block font-medium text-slate-700">Telefon</label>
+                  <input
+                    name="phone"
+                    value={provisionForm.phone}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    disabled={provisionLoading}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block font-medium text-slate-700">Sicil No</label>
+                  <input
+                    name="sicilNo"
+                    value={provisionForm.sicilNo}
+                    onChange={handleProvisionChange}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    disabled={provisionLoading}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block font-medium text-slate-700">
-                  Yönetici (Manager)
-                </label>
+                <label className="mb-1 block font-medium text-slate-700">Yönetici</label>
                 <select
                   name="managerId"
-                  value={form.managerId}
-                  onChange={handleFormChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={provisionForm.managerId}
+                  onChange={handleProvisionChange}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                  disabled={provisionLoading}
                 >
-                  <option value="">Yönetici yok</option>
+                  <option value="0">Yönetici yok</option>
                   {allEmployees.map((emp) => (
                     <option key={emp.employeeId} value={emp.employeeId}>
                       {emp.fullName}
@@ -1025,21 +1152,24 @@ function EmployeesOrgChartFlow() {
                 <button
                   type="button"
                   onClick={closeAddModal}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  disabled={provisionLoading}
                 >
-                  İptal
+                  Kapat
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                  disabled={provisionLoading || !isAdmin}
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
                 >
-                  Kaydet
+                  {provisionLoading ? 'Oluşturuluyor…' : 'Kaydet'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }

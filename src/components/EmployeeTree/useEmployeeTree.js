@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getTree, createEmployee as apiCreateEmployee } from '../../services/employeeApi';
+import { getTree } from '../../services/employeeApi';
 
 // Basit tip dokümantasyonu
 // type EmployeeNode = {
@@ -151,35 +151,6 @@ function useEmployeeTree() {
     [selectedNodeId, flatIndex]
   );
 
-  const createEmployee = useCallback(
-    async ({ fullName, jobTitle, department, managerId }) => {
-      try {
-        const trimmedFullName = fullName?.trim() || '';
-        const parts = trimmedFullName.split(/\s+/);
-        const firstName = parts.shift() || '';
-        const lastName = parts.join(' ');
-
-        const payload = {
-          firstName,
-          lastName,
-          jobTitle: jobTitle?.trim() || null,
-          department: department?.trim() || null,
-          managerId: managerId ? Number(managerId) : null,
-          userId: null,
-          phone: null,
-          sicilNo: null,
-        };
-
-        const data = await apiCreateEmployee(payload);
-        return data;
-      } catch (err) {
-        // 401 vs diğer hatalar komponentte beslensin diye aynen fırlatıyoruz
-        throw err;
-      }
-    },
-    []
-  );
-
   return {
     tree,
     loading,
@@ -193,7 +164,6 @@ function useEmployeeTree() {
     toggleNode,
     selectNode: handleSelectNode,
     refetch: fetchTree,
-    createEmployee,
   };
 }
 
