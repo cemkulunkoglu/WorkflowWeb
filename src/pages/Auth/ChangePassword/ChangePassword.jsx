@@ -7,6 +7,7 @@ import "../auth.css";
 export default function ChangePassword() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -17,10 +18,30 @@ export default function ChangePassword() {
 
   const flash = location.state?.message;
 
+  // Canlı doğrulama durumları
+  const ruleMinLenOk = newPassword.length >= 6;
+  const ruleMatchOk = newPassword.length > 0 && newPassword === newPasswordConfirm;
+  const ruleDifferentOk = newPassword.length > 0 && currentPassword.length > 0 && newPassword !== currentPassword;
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setInfo("");
+
+    // Frontend doğrulama
+    if (newPassword.length < 6) {
+      setError("Yeni şifre en az 6 karakter olmalıdır.");
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setError("Yeni şifre ve yeni şifre tekrar aynı olmalıdır.");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setError("Yeni şifre, mevcut şifre ile aynı olamaz.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await AuthService.changePassword({ currentPassword, newPassword });
@@ -33,6 +54,7 @@ export default function ChangePassword() {
         return;
       }
       setInfo(res?.message || "Şifre değiştirildi.");
+      setNewPasswordConfirm("");
     } catch (err) {
       setError(err?.message || "Şifre değiştirilemedi.");
     } finally {
@@ -89,6 +111,32 @@ export default function ChangePassword() {
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none bg-white"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Yeni Şifre (Tekrar)</label>
+            <input
+              type="password"
+              value={newPasswordConfirm}
+              onChange={(e) => setNewPasswordConfirm(e.target.value)}
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none bg-white"
+              required
+            />
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <div className="font-semibold text-slate-800 mb-2">Şifre Kuralları</div>
+            <ul className="space-y-1 text-slate-700">
+              <li className={ruleMinLenOk ? "text-emerald-700" : "text-slate-600"}>
+                {ruleMinLenOk ? "✓" : "•"} Yeni şifre en az 6 karakter
+              </li>
+              <li className={ruleMatchOk ? "text-emerald-700" : "text-slate-600"}>
+                {ruleMatchOk ? "✓" : "•"} Yeni şifre ve tekrar aynı
+              </li>
+              <li className={ruleDifferentOk ? "text-emerald-700" : "text-slate-600"}>
+                {ruleDifferentOk ? "✓" : "•"} Yeni şifre, mevcut şifreden farklı
+              </li>
+            </ul>
           </div>
 
           <button
