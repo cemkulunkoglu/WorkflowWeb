@@ -1,9 +1,10 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { ReactFlow, Background, Controls, Handle, Position, MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import useEmployeeTree from './useEmployeeTree';
-import { getDetail, updateEmployee, deleteEmployee } from '../../services/employeeApi';
+import { getDetail, updateEmployee, deleteEmployee, getEmployeeAncestors } from '../../services/employeeApi';
+import EmployeeAncestorsPanel from './EmployeeAncestorsPanel';
 
 function EmployeeCardNode({ data }) {
   const { employee, isMatched, isSelected } = data || {};
@@ -179,6 +180,12 @@ function EmployeesOrgChartFlow() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(null);
+  const [ancestors, setAncestors] = useState([]);
+  const [ancestorsLoading, setAncestorsLoading] = useState(false);
+  const [ancestorsError, setAncestorsError] = useState(null);
+  const [depth, setDepth] = useState(10);
+  const [includeSelf, setIncludeSelf] = useState(false);
+  const ancestorsCacheRef = useRef(new Map());
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -316,6 +323,60 @@ function EmployeesOrgChartFlow() {
       isCancelled = true;
     };
   }, [selectedNodeId]);
+
+  // Üst zinciri (breadcrumb) için ancestors çek
+  useEffect(() => {
+    if (!selectedNodeId) {
+      setAncestors([]);
+      setAncestorsError(null);
+      setAncestorsLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const cacheKey = `${selectedNodeId}|${depth}|${includeSelf ? '1' : '0'}`;
+    const cached = ancestorsCacheRef.current.get(cacheKey);
+    if (cached) {
+      setAncestors(cached);
+      setAncestorsError(null);
+      setAncestorsLoading(false);
+      return;
+    }
+
+    const fetchAncestors = async () => {
+      setAncestorsLoading(true);
+      setAncestorsError(null);
+      try {
+        const data = await getEmployeeAncestors(selectedNodeId, depth, includeSelf);
+        if (isCancelled) return;
+        const safe = Array.isArray(data) ? data : [];
+        ancestorsCacheRef.current.set(cacheKey, safe);
+        setAncestors(safe);
+      } catch (err) {
+        if (isCancelled) return;
+        const status = err?.response?.status;
+        const backendMessage =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message;
+        if (status === 401) {
+          setAncestorsError('Oturum süresi doldu, tekrar giriş yapın.');
+        } else {
+          setAncestorsError(
+            backendMessage ||
+              `Üst zinciri alınırken bir hata oluştu${status ? ` (HTTP ${status})` : ''}.`
+          );
+        }
+      } finally {
+        if (!isCancelled) setAncestorsLoading(false);
+      }
+    };
+
+    fetchAncestors();
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedNodeId, depth, includeSelf]);
 
   const handleStartEdit = () => {
     if (!detail) return;
@@ -575,19 +636,39 @@ function EmployeesOrgChartFlow() {
         </div>
       </section>
 
-      {/* Sağ: Detay paneli */}
-      <aside className="md:flex-1 rounded-xl border border-slate-200 bg-white/90 p-3 sm:p-4 shadow-sm">
-        <h2 className="mb-2 text-sm font-semibold text-slate-800">
-          Çalışan Detayları
-        </h2>
-        {!selectedNode && (
-          <p className="text-xs text-slate-500">
-            Soldaki organizasyon şemasından bir çalışan seçtiğinizde detayları
-            burada görünecek.
-          </p>
-        )}
+      {/* Sağ: Üst Zinciri + Detay paneli */}
+      <aside className="md:flex-1 flex flex-col gap-4">
+        <EmployeeAncestorsPanel
+          selectedEmployeeId={selectedNodeId}
+          selectedEmployeeLabel={
+            detail
+              ? `${detail.fullName || '-'} • ${detail.jobTitle || '-'} • ${detail.department || '-'}`
+              : selectedNode
+              ? `${selectedNode.fullName || '-'} • ${selectedNode.jobTitle || '-'} • ${selectedNode.department || '-'}`
+              : ''
+          }
+          ancestors={ancestors}
+          depth={depth}
+          includeSelf={includeSelf}
+          isLoading={ancestorsLoading}
+          error={ancestorsError}
+          onDepthChange={setDepth}
+          onIncludeSelfChange={setIncludeSelf}
+          onCrumbClick={(employeeId) => selectNode({ employeeId })}
+        />
 
-        {detailLoading && selectedNode && (
+        <section className="rounded-xl border border-slate-200 bg-white/90 p-3 sm:p-4 shadow-sm">
+          <h2 className="mb-2 text-sm font-semibold text-slate-800">
+            Çalışan Detayları
+          </h2>
+          {!selectedNodeId && (
+            <p className="text-xs text-slate-500">
+              Soldaki organizasyon şemasından bir çalışan seçtiğinizde detayları
+              burada görünecek.
+            </p>
+          )}
+
+        {detailLoading && selectedNodeId && (
           <div className="mt-2 text-xs text-slate-500">Detaylar yükleniyor…</div>
         )}
 
@@ -603,7 +684,7 @@ function EmployeesOrgChartFlow() {
           </div>
         )}
 
-        {selectedNode && detail && !isEditing && (
+        {selectedNodeId && detail && !isEditing && (
           <div className="mt-2 space-y-2 text-xs text-slate-700">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -719,7 +800,7 @@ function EmployeesOrgChartFlow() {
           </div>
         )}
 
-        {selectedNode && detail && isEditing && (
+        {selectedNodeId && detail && isEditing && (
           <form
             onSubmit={handleEditSubmit}
             className="mt-2 space-y-3 text-xs text-slate-700"
@@ -853,6 +934,7 @@ function EmployeesOrgChartFlow() {
             </div>
           </form>
         )}
+        </section>
       </aside>
 
       {/* Yeni Çalışan Modalı */}

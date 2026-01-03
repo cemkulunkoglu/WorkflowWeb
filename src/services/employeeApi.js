@@ -27,4 +27,16 @@ export async function deleteEmployee(employeeId) {
   return response.data
 }
 
+// EmployeeAncestorDto:
+// { employeeId, fullName, jobTitle?, department?, managerId?, path?, level }
+export async function getEmployeeAncestors(employeeId, depth = 10, includeSelf = false) {
+  const response = await axiosClient.get(`${BASE}/${employeeId}/ancestors`, {
+    params: {
+      depth,
+      includeSelf,
+    },
+  })
+  return response.data
+}
+
 
