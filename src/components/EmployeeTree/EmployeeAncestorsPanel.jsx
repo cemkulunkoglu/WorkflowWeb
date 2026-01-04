@@ -28,7 +28,7 @@ export default function EmployeeAncestorsPanel({
         <div>
           <h2 className="text-sm font-semibold text-slate-800">Üst Zinciri</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            {selectedEmployeeId ? 'Yöneticiler zinciri (CEO’ya kadar).' : 'Bir çalışan seç.'}
+            {selectedEmployeeId ? 'Yöneticiler zinciri' : 'Bir çalışan seç.'}
           </p>
         </div>
       </div>

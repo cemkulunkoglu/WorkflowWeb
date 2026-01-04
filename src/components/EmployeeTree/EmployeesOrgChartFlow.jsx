@@ -180,7 +180,6 @@ function EmployeesOrgChartFlow() {
     firstName: '',
     lastName: '',
     phone: '',
-    sicilNo: '',
     jobTitle: '',
     department: '',
     managerId: '',
@@ -287,7 +286,6 @@ function EmployeesOrgChartFlow() {
       firstName: '',
       lastName: '',
       phone: '',
-      sicilNo: '',
       jobTitle: '',
       department: '',
       managerId: selectedNodeId ? String(selectedNodeId) : '',
@@ -315,7 +313,6 @@ function EmployeesOrgChartFlow() {
       firstName: provisionForm.firstName.trim(),
       lastName: provisionForm.lastName.trim(),
       phone: provisionForm.phone.trim() || null,
-      sicilNo: provisionForm.sicilNo.trim() || null,
       jobTitle: provisionForm.jobTitle.trim() || null,
       department: provisionForm.department.trim() || null,
       managerId:
@@ -341,7 +338,6 @@ function EmployeesOrgChartFlow() {
         firstName: '',
         lastName: '',
         phone: '',
-        sicilNo: '',
         jobTitle: '',
         department: '',
       }));
@@ -1119,18 +1115,6 @@ function EmployeesOrgChartFlow() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block font-medium text-slate-700">Sicil No</label>
-                  <input
-                    name="sicilNo"
-                    value={provisionForm.sicilNo}
-                    onChange={handleProvisionChange}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
-                    disabled={provisionLoading}
-                  />
-                </div>
-              </div>
-
-              <div>
                 <label className="mb-1 block font-medium text-slate-700">Yönetici</label>
                 <select
                   name="managerId"
@@ -1146,6 +1130,7 @@ function EmployeesOrgChartFlow() {
                     </option>
                   ))}
                 </select>
+                </div>
               </div>
 
               <div className="mt-4 flex justify-end gap-2">
