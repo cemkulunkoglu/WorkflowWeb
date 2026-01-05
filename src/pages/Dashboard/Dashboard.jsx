@@ -51,7 +51,7 @@ function Dashboard() {
     setIsLoadingDesigns(true);
     try {
       // Backend'den listeyi çekiyoruz
-      const response = await axiosClient.get(API_ROUTES.WORKFLOW.GET_ALL);
+      const response = await axiosClient.get(API_ROUTES.WORKFLOW.GET_MINE);
       setDesignList(response.data);
     } catch (error) {
       console.error("Tasarımlar yüklenirken hata:", error);
