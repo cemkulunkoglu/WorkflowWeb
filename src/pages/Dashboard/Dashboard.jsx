@@ -4,6 +4,7 @@ import LeaveRequestModal from '../../components/LeaveRequestModal/LeaveRequestMo
 import NotesFlow from '../../components/Notes/NotesFlow'
 import EmployeesOrgChartFlow from '../../components/EmployeeTree/EmployeesOrgChartFlow'
 import { useAuth } from '../../auth/AuthContext'
+import MessagesPanel from '../../components/Messages/MessagesPanel'
 
 // Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
@@ -155,12 +156,12 @@ function Dashboard() {
                 Süreçler
               </button>
               <button
-                onClick={() => setActiveTab('gelen-kutusu')}
+                onClick={() => setActiveTab('messages')}
                 className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
-                  activeTab === 'gelen-kutusu' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  activeTab === 'messages' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
-                Gelen Kutusu
+                Mesajlar
               </button>
               <button
                 onClick={() => setActiveTab('taleplerim')}
@@ -231,9 +232,14 @@ function Dashboard() {
             </div>
           )}
 
-          {/* 2. TAB: Gelen Kutusu */}
-          {activeTab === 'gelen-kutusu' && (
-             <div className="text-slate-500 text-center py-8">Gelen kutusunda mesaj bulunmamaktadır.</div>
+          {/* 2. TAB: Mesajlar */}
+          {activeTab === 'messages' && (
+            <div>
+              <div className="mb-4">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Mesajlar</h2>
+              </div>
+              <MessagesPanel />
+            </div>
           )}
 
           {/* 3. TAB: Taleplerim */}
