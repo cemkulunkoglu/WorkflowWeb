@@ -8,6 +8,7 @@ export const API_ROUTES = {
   },
   WORKFLOW: {
     GET_ALL: `${WORKFLOW_BASE_URL}/flow-designs`,
+    GET_MINE: `${WORKFLOW_BASE_URL}/flow-designs/mine`,
     GET_BY_ID: (id) => `${WORKFLOW_BASE_URL}/flow-design/${id}`,
     CREATE: `${WORKFLOW_BASE_URL}/flow-design/create`,
     UPDATE: (id) => `${WORKFLOW_BASE_URL}/flow-design/update/${id}`,
