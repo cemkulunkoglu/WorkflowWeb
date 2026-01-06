@@ -203,7 +203,6 @@ function EmployeesOrgChartFlow() {
     jobTitle: '',
     department: '',
     managerId: '',
-    userId: '',
   });
   const [editSaving, setEditSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -223,6 +222,13 @@ function EmployeesOrgChartFlow() {
   }, [feedbackMessage]);
 
   const allEmployees = useMemo(() => flattenEmployees(tree), [tree]);
+
+  const managerName = useMemo(() => {
+    if (!detail) return null;
+    if (detail.managerId === null || typeof detail.managerId === 'undefined') return null;
+    const mgr = allEmployees.find((e) => e.employeeId === detail.managerId);
+    return mgr?.fullName || null;
+  }, [detail, allEmployees]);
 
   const detailHierarchy = useMemo(() => {
     if (!detail || !detail.path) return [];
@@ -470,10 +476,6 @@ function EmployeesOrgChartFlow() {
         detail.managerId === null || typeof detail.managerId === 'undefined'
           ? ''
           : String(detail.managerId),
-      userId:
-        detail.userId === null || typeof detail.userId === 'undefined'
-          ? ''
-          : String(detail.userId),
     });
     setFeedbackMessage(null);
     setIsEditing(true);
@@ -493,10 +495,11 @@ function EmployeesOrgChartFlow() {
     setDetailError(null);
 
     const payload = {
+      // userId UI'da gösterilmez/düzenlenmez; mevcut değeri koruyalım.
       userId:
-        editForm.userId === '' || editForm.userId === null
+        detail?.userId === null || typeof detail?.userId === 'undefined'
           ? null
-          : Number(editForm.userId),
+          : Number(detail.userId),
       firstName: editForm.firstName.trim(),
       lastName: editForm.lastName.trim(),
       phone: editForm.phone.trim() || null,
@@ -785,53 +788,11 @@ function EmployeesOrgChartFlow() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                  Çalışan ID
-                </div>
-                <div>{detail.employeeId}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                  Yöneticisi (ManagerId)
+                  Yönetici
                 </div>
                 <div>
-                  {detail.managerId !== null && typeof detail.managerId !== 'undefined'
-                    ? detail.managerId
-                    : '-'}
+                  {managerName || '-'}
                 </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                  Kullanıcı ID (userId)
-                </div>
-                <div>
-                  {detail.userId !== null && typeof detail.userId !== 'undefined'
-                    ? detail.userId
-                    : '-'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-slate-400">
-                  Hiyerarşik Durumu
-                </div>
-                {detailHierarchy.length === 0 ? (
-                  <div className="text-[11px] text-slate-500">-</div>
-                ) : (
-                  <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
-                    {detailHierarchy.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-1"
-                      >
-                        <span className="font-medium">
-                          {item.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -920,7 +881,7 @@ function EmployeesOrgChartFlow() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-[11px] font-medium text-slate-700">
-                  Manager ID
+                  Yönetici
                 </label>
                   <select
                   name="managerId"
@@ -935,17 +896,6 @@ function EmployeesOrgChartFlow() {
                     </option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-medium text-slate-700">
-                  Kullanıcı ID (userId)
-                </label>
-                <input
-                  name="userId"
-                  value={editForm.userId}
-                  onChange={handleEditChange}
-                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
               </div>
             </div>
 
