@@ -41,6 +41,20 @@
   background-color: #f1f5f9;
   color: #334155;
 }
+/* MUI Button kullanınca (emotion) kendi stillerini en son bastığı için
+   bu butonları MUI'ye özel selector ile sabitleyelim. */
+.notes-flow-header__back-btn.MuiButton-root {
+  min-width: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  color: #64748b !important;
+}
+.notes-flow-header__back-btn.MuiButton-root:hover {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+}
 
 .notes-flow-header__title-input {
   font-size: 1.25rem;
@@ -123,6 +137,46 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none !important;
+}
+
+/* MUI Button ile toolbar butonlarının "ürün" gibi görünmesi için kesin override */
+.notes-flow-tool-btn.MuiButton-root {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  padding: 0.5rem 0.75rem !important;
+  min-width: unset !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  color: #475569 !important;
+  background-color: #fff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  line-height: 1.25rem !important;
+}
+.notes-flow-tool-btn.MuiButton-root:hover:not(.Mui-disabled) {
+  border-color: #cbd5e1 !important;
+  background-color: #f8fafc !important;
+  transform: translateY(-1px);
+}
+.notes-flow-tool-btn--active.MuiButton-root {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+  border-color: #bfdbfe !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1) !important;
+}
+.notes-flow-tool-btn.MuiButton-root.Mui-disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+/* MUI Button içindeki content wrapper'ları spacing'i bozmasın */
+.notes-flow-tool-btn .MuiButton-startIcon,
+.notes-flow-tool-btn .MuiButton-endIcon {
+  margin: 0 !important;
 }
 
 /* Label Editor */

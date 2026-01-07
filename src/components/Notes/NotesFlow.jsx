@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -19,6 +19,9 @@ import "./NotesFlow.css";
 
 import axiosClient from "../../config/axiosClient";
 import { API_ROUTES } from "../../config/apiConfig";
+import { notify, notifyApiError } from "../../utils/notify";
+import ConfirmDialog from "../common/ConfirmDialog";
+import { Button } from "@mui/material";
 
 const STORAGE_FLOW_ID_KEY = "notes-flow-id";
 
@@ -73,7 +76,32 @@ export default function NotesFlow({
   const [labelEditorValue, setLabelEditorValue] = useState("");
   const [flowId, setFlowId] = useState(propFlowId || null);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState(null);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const deleteDialogResolveRef = useRef(null);
+
+  const confirmDeleteRemote = useCallback(() => {
+    setDeleteDialogOpen(true);
+    return new Promise((resolve) => {
+      deleteDialogResolveRef.current = resolve;
+    });
+  }, []);
+
+  const handleDeleteDialogClose = useCallback((confirmed) => {
+    setDeleteDialogOpen(false);
+    const resolve = deleteDialogResolveRef.current;
+    deleteDialogResolveRef.current = null;
+    resolve?.(Boolean(confirmed));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      // unmount olursa bekleyen confirm varsa iptal sayalım
+      const resolve = deleteDialogResolveRef.current;
+      deleteDialogResolveRef.current = null;
+      resolve?.(false);
+    };
+  }, []);
 
   const computeCountsFromNodes = useCallback((nodeList) => {
     const counts = { start: 0, decision: 0, step: 0 };
@@ -136,7 +164,7 @@ export default function NotesFlow({
           }
           setFlowId(null);
         } else {
-          setSaveMessage({ type: "error", text: "Veri yüklenemedi" });
+          notifyApiError(error, "Veri yüklenemedi.");
         }
       }
     };
@@ -300,7 +328,6 @@ export default function NotesFlow({
   // --- KAYDETME ---
   const handleSave = useCallback(async () => {
     setIsSaving(true);
-    setSaveMessage(null);
 
     const currentNodes = reactFlowInstance
       ? reactFlowInstance.getNodes()
@@ -361,16 +388,14 @@ export default function NotesFlow({
         }
       }
 
-      setSaveMessage({ type: "success", text: "Başarıyla kaydedildi." });
+      notify.success("Başarıyla kaydedildi.");
 
       if (onSaveSuccess) onSaveSuccess();
     } catch (error) {
       console.error("Kaydetme hatası:", error);
-      const message = error.response?.data?.message || error.message;
-      setSaveMessage({ type: "error", text: "Kaydedilemedi: " + message });
+      notifyApiError(error, "Kaydedilemedi.");
     } finally {
       setIsSaving(false);
-      setTimeout(() => setSaveMessage(null), 3000);
     }
   }, [
     edges,
@@ -387,8 +412,8 @@ export default function NotesFlow({
   // --- SİLME ---
   const handleDeleteRemote = useCallback(async () => {
     if (!flowId) return;
-    if (!window.confirm("Bu akışı sunucudan silmek istediğinize emin misiniz?"))
-      return;
+    const ok = await confirmDeleteRemote();
+    if (!ok) return;
 
     setIsSaving(true);
     try {
@@ -403,15 +428,15 @@ export default function NotesFlow({
         window.localStorage.removeItem(STORAGE_FLOW_ID_KEY);
       }
 
-      setSaveMessage({ type: "success", text: "Sunucudan silindi." });
+      notify.success("Sunucudan silindi.");
 
       if (onSaveSuccess) onSaveSuccess();
+      if (onClose) onClose();
     } catch (error) {
       console.error("Silme hatası:", error);
-      setSaveMessage({ type: "error", text: "Silinemedi!" });
+      notifyApiError(error, "Silinemedi.");
     } finally {
       setIsSaving(false);
-      setTimeout(() => setSaveMessage(null), 3000);
     }
   }, [flowId, setNodes, setEdges, propFlowId, onSaveSuccess]);
 
@@ -435,14 +460,30 @@ export default function NotesFlow({
 
   return (
     <div className="notes-flow-wrapper">
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Akış silinsin mi?"
+        description="Bu akış sunucudan silinecek. Bu işlem geri alınamaz."
+        confirmText="Evet, sil"
+        cancelText="Vazgeç"
+        tone="error"
+        onClose={handleDeleteDialogClose}
+      />
       {/* 1. HEADER KISMI: Genel İşlemler */}
       <div className="notes-flow-header">
         <div className="notes-flow-header__left">
           {onClose && (
-            <button
+            <Button
+              variant="text"
+              disableRipple
               onClick={onClose}
               className="notes-flow-header__back-btn"
               title="Kapat / Geri Dön"
+              sx={{
+                minWidth: "auto",
+                padding: 0,
+                borderRadius: 0,
+              }}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -458,7 +499,7 @@ export default function NotesFlow({
                 <path d="M19 12H5" />
                 <path d="M12 19l-7-7 7-7" />
               </svg>
-            </button>
+            </Button>
           )}
           <input
             type="text"
@@ -473,24 +514,19 @@ export default function NotesFlow({
         </div>
 
         <div className="notes-flow-header__right">
-          {saveMessage && (
-            <span
-              className={`text-sm px-3 py-1 rounded font-medium ${
-                saveMessage.type === "success"
-                  ? "bg-green-50 text-green-600"
-                  : "bg-red-50 text-red-600"
-              }`}
-            >
-              {saveMessage.text}
-            </span>
-          )}
-
           {flowId && (
-            <button
+            <Button
+              variant="text"
+              disableRipple
               onClick={handleDeleteRemote}
               disabled={isSaving}
               className="notes-flow-tool-btn text-red-600 hover:bg-red-50 border-transparent"
               title="Bu tasarımı tamamen sil"
+              sx={{
+                minWidth: "auto",
+                padding: 0,
+                textTransform: "none",
+              }}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -508,17 +544,15 @@ export default function NotesFlow({
                 <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
               </svg>
               <span className="hidden sm:inline">Sil</span>
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
+            variant="contained"
             onClick={handleSave}
             disabled={isSaving}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-2 ${
-              isSaving
-                ? "bg-slate-100 text-slate-400 cursor-wait"
-                : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
-            }`}
+            className="px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2"
+            sx={{ textTransform: "none" }}
           >
             {isSaving ? (
               <>
@@ -564,7 +598,7 @@ export default function NotesFlow({
                 <span>{flowId ? "Güncelle" : "Kaydet"}</span>
               </>
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -576,31 +610,45 @@ export default function NotesFlow({
             Şekiller
           </span>
           {shapeOptions.map((option) => (
-            <button
+            <Button
               key={option.type}
               type="button"
               onClick={() => handleSelectType(option.type)}
+              variant="text"
+              disableRipple
               className={`notes-flow-tool-btn ${
                 selectedNodeType === option.type
                   ? "notes-flow-tool-btn--active"
                   : ""
               }`}
               title={`${option.label} Ekle`}
+              sx={{
+                minWidth: "auto",
+                padding: 0,
+                textTransform: "none",
+              }}
             >
               {renderShapePreview(option.type)}
               <span className="hidden sm:inline">{option.label}</span>
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* Düzenleme Grubu */}
         <div className="notes-flow-tool-group">
-          <button
+          <Button
             type="button"
             onClick={handleDeleteSelected}
             disabled={selectedNodeIds.length === 0}
+            variant="text"
+            disableRipple
             className="notes-flow-tool-btn text-slate-600 hover:text-red-600"
             title="Seçili elemanları sil"
+            sx={{
+              minWidth: "auto",
+              padding: 0,
+              textTransform: "none",
+            }}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -618,7 +666,7 @@ export default function NotesFlow({
               <line x1="10" y1="11" x2="10" y2="17" />
               <line x1="14" y1="11" x2="14" y2="17" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* Etiket Editörü (Dinamik) */}

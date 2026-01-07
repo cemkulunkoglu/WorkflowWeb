@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ChatMessageBubble, { getMessageId } from "./ChatMessageBubble";
+import { Fab, IconButton } from "@mui/material";
+import AssistantIcon from "@mui/icons-material/Assistant";
+import SendIcon from "@mui/icons-material/Send";
+import CloseIcon from "@mui/icons-material/Close";
 
 const STREAM_URL = "https://localhost:7299/stream";
 const SEND_URL = "https://localhost:7299/api/chat/send";
@@ -303,12 +307,23 @@ export default function ChatWidget() {
 
   return (
     <>
-      <button type="button" className="chatw-btn" onClick={handleToggle} aria-label="Chat aç/kapat">
-        <span className="chatw-btn-icon" aria-hidden="true">
-          💬
-        </span>
-        <span className="chatw-btn-text">Chat</span>
-      </button>
+      <Fab
+        type="button"
+        className="chatw-btn"
+        onClick={handleToggle}
+        aria-label="Chat aç/kapat"
+        sx={{
+          position: "fixed",
+          right: 16,
+          bottom: 16,
+          zIndex: 60,
+          width: 56,
+          height: 56,
+          minHeight: 0,
+        }}
+      >
+        <AssistantIcon />
+      </Fab>
 
       {isOpen ? (
         <div className="chatw-panel" role="dialog" aria-label="Chat paneli">
@@ -327,9 +342,15 @@ export default function ChatWidget() {
                 </span>
               </div>
             </div>
-            <button type="button" className="chatw-close" onClick={handleToggle} aria-label="Kapat">
-              ✕
-            </button>
+            <IconButton
+              type="button"
+              className="chatw-close"
+              onClick={handleToggle}
+              aria-label="Kapat"
+              size="small"
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
           </div>
 
           {!token ? (
@@ -377,23 +398,19 @@ export default function ChatWidget() {
               ref={inputRef}
               disabled={!token}
             />
-            <button
+            <IconButton
               type="button"
               className="chatw-send"
               onClick={handleSend}
               disabled={!inputText.trim() || isSending || !canSend}
+              size="large"
             >
               {isSending ? (
                 <span className="chatw-spinner" aria-label="Gönderiliyor" />
               ) : (
-                <>
-                  <span className="chatw-send-text">Gönder</span>
-                  <span className="chatw-send-icon" aria-hidden="true">
-                    ➤
-                  </span>
-                </>
+                <SendIcon />
               )}
-            </button>
+            </IconButton>
           </div>
         </div>
       ) : null}

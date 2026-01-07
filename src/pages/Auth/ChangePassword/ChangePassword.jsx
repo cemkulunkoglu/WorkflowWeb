@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthService } from "../../../auth/authService";
 import { useAuth } from "../../../auth/AuthContext";
+import { Button } from "@mui/material";
 import "../auth.css";
 
 export default function ChangePassword() {
@@ -139,15 +140,18 @@ export default function ChangePassword() {
             </ul>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="contained"
+            fullWidth
             disabled={isLoading}
             className={`w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 rounded-lg shadow-lg transition-all duration-200 flex justify-center items-center gap-2 ${
               isLoading ? "opacity-70 cursor-not-allowed" : "hover:from-blue-700 hover:to-blue-800"
             }`}
+            sx={{ textTransform: "none" }}
           >
             {isLoading ? "Kaydediliyor..." : "Şifreyi Güncelle"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

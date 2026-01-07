@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@mui/material';
 
 function EmployeeNode({
   node,
@@ -27,14 +28,31 @@ function EmployeeNode({
     <div className="mb-2" style={{ marginLeft: depth === 0 ? 0 : Math.min(depth, 4) * 16 }}>
       <div className="flex items-start gap-2">
         {hasChildren && (
-          <button
+          <Button
             type="button"
+            variant="outlined"
+            size="small"
             onClick={() => onToggle(node.employeeId)}
-            className="mt-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-[10px] text-slate-600 hover:bg-slate-50"
             aria-label={isExpanded ? 'Alt çalışanları gizle' : 'Alt çalışanları göster'}
+            sx={{
+              minWidth: 20,
+              width: 20,
+              height: 20,
+              padding: 0,
+              borderRadius: 9999,
+              lineHeight: 1,
+              fontSize: 10,
+              textTransform: 'none',
+              color: 'rgba(71, 85, 105, 1)',
+              borderColor: 'rgba(203, 213, 225, 1)',
+              '&:hover': {
+                borderColor: 'rgba(148, 163, 184, 1)',
+                backgroundColor: 'rgba(248, 250, 252, 1)',
+              },
+            }}
           >
             {isExpanded ? '−' : '+'}
-          </button>
+          </Button>
         )}
         {!hasChildren && <div className="w-5" aria-hidden="true" />}
 

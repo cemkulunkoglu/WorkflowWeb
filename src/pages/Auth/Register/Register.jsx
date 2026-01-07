@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { API_ROUTES } from '../../../config/apiConfig'
+import { Button } from '@mui/material'
 import '../auth.css'
 
 function Register({ onSwitchToLogin }) {
@@ -203,10 +204,13 @@ function Register({ onSwitchToLogin }) {
           </div>
 
           <div className="pt-2 space-y-3">
-            <button
+            <Button
               type="submit"
+              variant="contained"
+              fullWidth
               disabled={isLoading}
               className={`w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02] hover:shadow-xl flex justify-center items-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              sx={{ textTransform: 'none' }}
             >
               {isLoading ? (
                 <>
@@ -219,20 +223,23 @@ function Register({ onSwitchToLogin }) {
               ) : (
                 'Hesap Oluştur'
               )}
-            </button>
+            </Button>
           </div>
 
           <div className="pt-4 border-t border-slate-200">
             <p className="text-xs text-center text-slate-500 mb-3">
               Zaten hesabınız var mı?
             </p>
-            <button
+            <Button
               type="button"
+              variant="text"
+              fullWidth
               onClick={onSwitchToLogin}
               className="w-full text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-200"
+              sx={{ textTransform: 'none' }}
             >
               Giriş Yap
-            </button>
+            </Button>
           </div>
         </form>
       </div>

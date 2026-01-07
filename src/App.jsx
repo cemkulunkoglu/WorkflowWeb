@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import Login from './pages/Auth/Login/Login'
 import Register from './pages/Auth/Register/Register'
 import Dashboard from './pages/Dashboard/Dashboard'
@@ -26,6 +28,20 @@ function App() {
   return (
     <BrowserRouter>
       <div className="relative min-h-screen">
+        <ToastContainer
+          position="bottom-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable={false}
+          pauseOnHover
+          theme="light"
+          limit={4}
+        />
+
         <Routes>
           <Route
             path="/login"

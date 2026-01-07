@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Button } from '@mui/material'
 
 function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
@@ -102,14 +103,17 @@ function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
       <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800">İzin Talep Formu</h2>
-          <button
+          <Button
+            variant="text"
+            disableRipple
             onClick={handleClose}
             className="text-slate-500 hover:text-slate-700 transition-colors"
+            sx={{ minWidth: 'auto', padding: 0, textTransform: 'none' }}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {submitError ? (
@@ -188,23 +192,29 @@ function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button
+            <Button
               type="button"
+              variant="outlined"
+              fullWidth
               onClick={handleClose}
               disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors duration-200"
+              sx={{ textTransform: 'none' }}
             >
               İptal
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="contained"
+              fullWidth
               disabled={isSubmitting}
               className={`flex-1 px-4 py-3 text-white font-semibold rounded-lg transition-colors duration-200 ${
                 isSubmitting ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
               }`}
+              sx={{ textTransform: 'none' }}
             >
               {isSubmitting ? 'Gönderiliyor...' : 'Gönder'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

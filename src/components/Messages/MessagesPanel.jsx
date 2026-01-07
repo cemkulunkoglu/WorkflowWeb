@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getEmployeeIdFromToken } from "../../auth/jwtClaims";
 import { MessagesApi } from "../../services/messagesApi";
+import { Button } from "@mui/material";
+import { Box, Tab } from "@mui/material";
+import { TabContext, TabList, TabPanel } from "@mui/lab";
 
 function getField(obj, keys) {
   for (const k of keys) {
@@ -67,14 +70,28 @@ function MessageModal({ open, onClose, title, children }) {
       <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
           <div className="font-semibold text-slate-900 text-sm">{title}</div>
-          <button
+          <Button
             type="button"
+            variant="text"
+            disableRipple
             onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800"
             aria-label="Kapat"
+            sx={{
+              minWidth: 0,
+              width: 32,
+              height: 32,
+              padding: 0,
+              borderRadius: 9999,
+              textTransform: "none",
+              color: "rgba(100, 116, 139, 1)",
+              "&:hover": {
+                backgroundColor: "rgba(241, 245, 249, 1)",
+                color: "rgba(15, 23, 42, 1)",
+              },
+            }}
           >
             ✕
-          </button>
+          </Button>
         </div>
         <div className="p-4">{children}</div>
       </div>
@@ -278,19 +295,25 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
     [outbox]
   );
 
+  const handleTabChange = (_, newValue) => {
+    setTab(newValue);
+  };
+
   return (
     <div className="w-full">
       {showHeader ? (
         <div className="mb-4 flex items-start sm:items-center justify-between gap-3">
           <div className="flex items-start sm:items-center gap-3">
             {onBack ? (
-              <button
+              <Button
                 type="button"
+                variant="outlined"
+                size="small"
                 onClick={onBack}
-                className="px-3 py-2 text-xs sm:text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors duration-200 font-medium"
+                sx={{ textTransform: "none" }}
               >
                 ← Geri
-              </button>
+              </Button>
             ) : null}
             <div>
               <div className="text-sm sm:text-base font-bold text-slate-800">
@@ -302,14 +325,16 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
             </div>
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="outlined"
+            size="small"
             onClick={refreshActive}
             disabled={!canUseApi || loading}
-            className="px-3 py-2 text-xs sm:text-sm bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-colors duration-200 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            sx={{ textTransform: "none" }}
           >
             Yenile
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -327,128 +352,118 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
       ) : null}
 
       <div className="mt-4">
-        <div className="border-b border-slate-200">
-          <nav className="flex gap-6" aria-label="Tabs">
-            <button
-              type="button"
-              onClick={() => setTab("inbox")}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                tab === "inbox"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              Gelen Kutusu{" "}
-              {unreadCount > 0 ? (
-                <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-                  {unreadCount} okunmadı
-                </span>
-              ) : null}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("outbox")}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                tab === "outbox"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              Giden Kutusu{" "}
-              {pendingCount > 0 ? (
-                <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
-                  {pendingCount} beklemede
-                </span>
-              ) : null}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("compose")}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                tab === "compose"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              Yeni Mesaj
-            </button>
-          </nav>
-        </div>
+        <TabContext value={tab}>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <TabList onChange={handleTabChange} aria-label="Mesajlar sekmeleri">
+              <Tab
+                value="inbox"
+                sx={{ textTransform: "none" }}
+                label={
+                  <span>
+                    Gelen Kutusu{" "}
+                    {unreadCount > 0 ? (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
+                        {unreadCount} okunmadı
+                      </span>
+                    ) : null}
+                  </span>
+                }
+              />
+              <Tab
+                value="outbox"
+                sx={{ textTransform: "none" }}
+                label={
+                  <span>
+                    Giden Kutusu{" "}
+                    {pendingCount > 0 ? (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+                        {pendingCount} beklemede
+                      </span>
+                    ) : null}
+                  </span>
+                }
+              />
+              <Tab value="compose" label="Yeni Mesaj" sx={{ textTransform: "none" }} />
+            </TabList>
+          </Box>
 
-        <div className="mt-6 bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6">
-          {loading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600" />
-              Yükleniyor…
-            </div>
-          ) : null}
+          <div className="mt-6 bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6">
+            {loading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600" />
+                Yükleniyor…
+              </div>
+            ) : null}
 
-          {tab === "inbox" && !loading ? (
-            <div className="space-y-3">
-              {inbox.length === 0 ? (
-                <div className="text-slate-500 text-center py-10">
-                  Gelen kutusu boş.
+            <TabPanel value="inbox" sx={{ p: 0 }}>
+              {!loading ? (
+                <div className="space-y-3">
+                  {inbox.length === 0 ? (
+                    <div className="text-slate-500 text-center py-10">
+                      Gelen kutusu boş.
+                    </div>
+                  ) : (
+                    inbox.map((m, idx) => {
+                      const unread = !m.updateDate;
+                      return (
+                        <ListRow
+                          key={m.id != null ? String(m.id) : `in-${idx}`}
+                          msg={m}
+                          onClick={() => openMessage("inbox", m)}
+                          rightBadge={
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
+                                unread
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : "bg-slate-50 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {unread ? "Okunmadı" : "Okundu"}
+                            </span>
+                          }
+                        />
+                      );
+                    })
+                  )}
                 </div>
-              ) : (
-                inbox.map((m, idx) => {
-                  const unread = !m.updateDate;
-                  return (
-                    <ListRow
-                      key={m.id != null ? String(m.id) : `in-${idx}`}
-                      msg={m}
-                      onClick={() => openMessage("inbox", m)}
-                      rightBadge={
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-                            unread
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-slate-50 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          {unread ? "Okunmadı" : "Okundu"}
-                        </span>
-                      }
-                    />
-                  );
-                })
-              )}
-            </div>
-          ) : null}
+              ) : null}
+            </TabPanel>
 
-          {tab === "outbox" && !loading ? (
-            <div className="space-y-3">
-              {outbox.length === 0 ? (
-                <div className="text-slate-500 text-center py-10">
-                  Giden kutusu boş.
+            <TabPanel value="outbox" sx={{ p: 0 }}>
+              {!loading ? (
+                <div className="space-y-3">
+                  {outbox.length === 0 ? (
+                    <div className="text-slate-500 text-center py-10">
+                      Giden kutusu boş.
+                    </div>
+                  ) : (
+                    outbox.map((m, idx) => {
+                      const sent = Boolean(m.updateDate);
+                      return (
+                        <ListRow
+                          key={m.id != null ? String(m.id) : `out-${idx}`}
+                          msg={m}
+                          onClick={() => openMessage("outbox", m)}
+                          rightBadge={
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
+                                sent
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                  : "bg-amber-50 text-amber-800 border-amber-200"
+                              }`}
+                            >
+                              {sent ? "Gönderildi" : "Beklemede"}
+                            </span>
+                          }
+                        />
+                      );
+                    })
+                  )}
                 </div>
-              ) : (
-                outbox.map((m, idx) => {
-                  const sent = Boolean(m.updateDate);
-                  return (
-                    <ListRow
-                      key={m.id != null ? String(m.id) : `out-${idx}`}
-                      msg={m}
-                      onClick={() => openMessage("outbox", m)}
-                      rightBadge={
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-                            sent
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              : "bg-amber-50 text-amber-800 border-amber-200"
-                          }`}
-                        >
-                          {sent ? "Gönderildi" : "Beklemede"}
-                        </span>
-                      }
-                    />
-                  );
-                })
-              )}
-            </div>
-          ) : null}
+              ) : null}
+            </TabPanel>
 
-          {tab === "compose" ? (
-            <div>
+            <TabPanel value="compose" sx={{ p: 0 }}>
               {sendResult?.id ? (
                 <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm">
                   Mesaj kuyruğa alındı. <span className="font-semibold">Id</span>:{" "}
@@ -520,8 +535,9 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="outlined"
                     onClick={() =>
                       setCompose({
                         toEmployeeId: "",
@@ -530,23 +546,24 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
                         body: "",
                       })
                     }
-                    className="px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors font-medium"
                     disabled={sending}
+                    sx={{ textTransform: "none" }}
                   >
                     Temizle
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
+                    variant="contained"
                     disabled={sending}
+                    sx={{ textTransform: "none" }}
                   >
                     {sending ? "Gönderiliyor…" : "Gönder"}
-                  </button>
+                  </Button>
                 </div>
               </form>
-            </div>
-          ) : null}
-        </div>
+            </TabPanel>
+          </div>
+        </TabContext>
       </div>
     </div>
   );

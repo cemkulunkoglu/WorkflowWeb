@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Button } from '@mui/material';
 
 function formatDepthLabel(depth) {
   if (!depth) return '10';
@@ -77,13 +78,22 @@ export default function EmployeeAncestorsPanel({
           <div className="flex flex-wrap items-center gap-1 text-xs text-slate-700">
             {ancestors.map((a, idx) => (
               <React.Fragment key={a.employeeId}>
-                <button
+                <Button
                   type="button"
+                  variant="text"
+                  size="small"
+                  disableRipple
                   onClick={() => onCrumbClick(a.employeeId)}
                   className="rounded px-1 py-0.5 text-left font-medium text-slate-800 hover:bg-slate-200/70"
+                  sx={{
+                    textTransform: 'none',
+                    minWidth: 'auto',
+                    padding: 0,
+                    justifyContent: 'flex-start',
+                  }}
                 >
                   {a.fullName || `ID ${a.employeeId}`}
-                </button>
+                </Button>
                 {idx !== ancestors.length - 1 && (
                   <span className="text-slate-400">{'>'}</span>
                 )}

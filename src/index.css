@@ -45,21 +45,11 @@
 
 /* --- ChatWidget (SSE) --- */
 .chatw-btn {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: white;
-  font-weight: 600;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+  background: linear-gradient(135deg, #2563eb, #4f46e5) !important;
+  color: white !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease !important;
 }
 .chatw-btn:hover {
   transform: translateY(-1px);
@@ -69,12 +59,8 @@
 .chatw-btn:active {
   transform: translateY(0px);
 }
-.chatw-btn-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-.chatw-btn-text {
-  font-size: 14px;
+.chatw-btn .MuiSvgIcon-root {
+  font-size: 26px;
 }
 
 .chatw-panel {
@@ -306,7 +292,7 @@
   background: rgba(248, 250, 252, 0.9);
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: center;
 }
 .chatw-input {
   flex: 1;
@@ -324,10 +310,12 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 .chatw-send {
-  border-radius: 12px;
-  padding: 9px 12px;
+  border-radius: 9999px !important;
+  width: 42px;
+  height: 42px;
+  padding: 0 !important;
   background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: white;
+  color: white !important;
   font-weight: 600;
   font-size: 13px;
   display: inline-flex;
@@ -347,10 +335,8 @@
   transform: none;
   filter: none;
 }
-.chatw-send-icon {
-  font-size: 12px;
-  line-height: 1;
-  opacity: 0.95;
+.chatw-send .MuiSvgIcon-root {
+  font-size: 20px;
 }
 .chatw-spinner {
   width: 14px;

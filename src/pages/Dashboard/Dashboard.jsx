@@ -6,6 +6,9 @@ import EmployeesOrgChartFlow from '../../components/EmployeeTree/EmployeesOrgCha
 import { useAuth } from '../../auth/AuthContext'
 import MessagesPanel from '../../components/Messages/MessagesPanel'
 import { LeaveRequestsApi } from '../../api/leaveRequestsApi'
+import { notify, notifyApiError } from '../../utils/notify'
+import { Button, Box, Tab } from '@mui/material'
+import { TabContext, TabList, TabPanel } from '@mui/lab'
 
 // Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
@@ -27,9 +30,6 @@ function Dashboard() {
   const [leaveRequestsError, setLeaveRequestsError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [reasonQuery, setReasonQuery] = useState('')
-
-  // lightweight toast
-  const [toast, setToast] = useState(null) // { type: 'success'|'error', message: string }
 
   // Flow Editor Modal State
   const [showFlowModal, setShowFlowModal] = useState(false)
@@ -66,6 +66,7 @@ function Dashboard() {
       setDesignList(response.data);
     } catch (error) {
       console.error("Tasarımlar yüklenirken hata:", error);
+      notifyApiError(error, 'Tasarımlar yüklenemedi. Lütfen tekrar deneyin.')
     } finally {
       setIsLoadingDesigns(false);
     }
@@ -101,18 +102,16 @@ function Dashboard() {
     }
   }, [activeTab])
 
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), 3000)
-    return () => clearTimeout(t)
-  }, [toast])
-
   // Designer değilse org-chart tabında kalmasın
   useEffect(() => {
     if (!isDesigner && activeTab === 'org-chart') {
       setActiveTab('surecler');
     }
   }, [isDesigner, activeTab]);
+
+  const handleTabChange = (_, newValue) => {
+    setActiveTab(newValue)
+  }
 
   const handleCreateNewFlow = () => {
     setSelectedFlowId(null);
@@ -219,93 +218,46 @@ function Dashboard() {
                   {displayName}
                 </span>
               </span>
-              <button
+              <Button
+                variant="outlined"
+                size="small"
                 onClick={handleLogout}
-                className="px-3 py-2 text-xs sm:text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors duration-200 font-medium self-start sm:self-auto"
+                className="self-start sm:self-auto"
+                sx={{ textTransform: 'none' }}
               >
                 Çıkış Yap
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {toast ? (
-          <div className="mb-4">
-            <div
-              className={`rounded-lg border px-4 py-3 text-sm ${
-                toast.type === 'success'
-                  ? 'border-green-200 bg-green-50 text-green-800'
-                  : 'border-red-200 bg-red-50 text-red-800'
-              }`}
+        <TabContext value={activeTab}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }} className="-mx-3 sm:mx-0 mb-6">
+            <TabList
+              onChange={handleTabChange}
+              aria-label="Dashboard tabs"
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                px: { xs: 1.5, sm: 0 },
+                '& .MuiTabs-indicator': { height: 3, borderRadius: 9999 },
+              }}
             >
-              {toast.message}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Tab Menü */}
-        <div className="mb-8">
-          <div className="border-b border-slate-200 -mx-3 sm:mx-0">
-            <nav
-              className="flex gap-4 sm:gap-8 overflow-x-auto px-3 sm:px-0"
-              aria-label="Tabs"
-            >
-              <button
-                onClick={() => setActiveTab('surecler')}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
-                  activeTab === 'surecler' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                Süreçler
-              </button>
-              <button
-                onClick={() => setActiveTab('messages')}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
-                  activeTab === 'messages' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                Mesajlar
-              </button>
-              <button
-                onClick={() => setActiveTab('taleplerim')}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
-                  activeTab === 'taleplerim' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                Taleplerim
-              </button>
-              <button
-                onClick={() => setActiveTab('flow-design')}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
-                  activeTab === 'flow-design' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                Akış Tasarımı
-              </button>
+              <Tab label="Süreçler" value="surecler" sx={{ textTransform: 'none' }} />
+              <Tab label="Mesajlar" value="messages" sx={{ textTransform: 'none' }} />
+              <Tab label="Taleplerim" value="taleplerim" sx={{ textTransform: 'none' }} />
+              <Tab label="Akış Tasarımı" value="flow-design" sx={{ textTransform: 'none' }} />
               {isDesigner ? (
-                <button
-                  onClick={() => setActiveTab('org-chart')}
-                  className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200 ${
-                    activeTab === 'org-chart'
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  Çalışan Hiyerarşisi
-                </button>
+                <Tab label="Çalışan Hiyerarşisi" value="org-chart" sx={{ textTransform: 'none' }} />
               ) : null}
-            </nav>
-          </div>
-        </div>
+            </TabList>
+          </Box>
 
-        {/* İçerik Alanı */}
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[320px] sm:min-h-[400px]">
-          
-          {/* 1. TAB: Süreçler */}
-          {activeTab === 'surecler' && (
-            <div>
+          {/* İçerik Alanı */}
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6 min-h-[320px] sm:min-h-[400px]">
+            <TabPanel value="surecler" sx={{ p: 0 }}>
               <div className="mb-6">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Süreçler</h2>
                 <p className="text-xs sm:text-sm text-slate-600">Aktif iş akışı süreçleriniz</p>
@@ -334,22 +286,16 @@ function Dashboard() {
                   ))}
                 </div>
               )}
-            </div>
-          )}
+            </TabPanel>
 
-          {/* 2. TAB: Mesajlar */}
-          {activeTab === 'messages' && (
-            <div>
+            <TabPanel value="messages" sx={{ p: 0 }}>
               <div className="mb-4">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Mesajlar</h2>
               </div>
               <MessagesPanel />
-            </div>
-          )}
+            </TabPanel>
 
-          {/* 3. TAB: Taleplerim */}
-          {activeTab === 'taleplerim' && (
-            <div>
+            <TabPanel value="taleplerim" sx={{ p: 0 }}>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Taleplerim</h2>
@@ -380,12 +326,14 @@ function Dashboard() {
                       />
                     </div>
                   </div>
-                  <button
+                  <Button
+                    variant="contained"
                     onClick={() => setIsModalOpen(true)}
-                    className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 self-start sm:self-auto"
+                    className="self-start sm:self-auto"
+                    sx={{ textTransform: 'none' }}
                   >
                     Yeni Talep
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -400,12 +348,13 @@ function Dashboard() {
               ) : filteredLeaveRequests.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
                   <p className="text-slate-500 mb-4">Henüz talep bulunmamaktadır.</p>
-                  <button
+                  <Button
+                    variant="text"
                     onClick={() => setIsModalOpen(true)}
-                    className="text-blue-600 hover:underline font-medium"
+                    sx={{ textTransform: 'none' }}
                   >
                     İlk talebini oluştur
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -464,12 +413,9 @@ function Dashboard() {
                   </table>
                 </div>
               )}
-            </div>
-          )}
+            </TabPanel>
 
-          {/* 4. TAB: Akış Tasarımı */}
-          {activeTab === 'flow-design' && (
-            <div>
+            <TabPanel value="flow-design" sx={{ p: 0 }}>
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Akış Tasarımlarım</h2>
@@ -477,13 +423,19 @@ function Dashboard() {
                     Kayıtlı tasarımlarınızı düzenleyin veya yeni oluşturun.
                   </p>
                 </div>
-                <button
+                <Button
+                  variant="contained"
                   onClick={handleCreateNewFlow}
-                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2 self-start sm:self-auto"
+                  className="self-start sm:self-auto"
+                  sx={{ textTransform: 'none' }}
+                  startIcon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  }
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   Yeni Tasarım
-                </button>
+                </Button>
               </div>
 
               {isLoadingDesigns ? (
@@ -493,7 +445,9 @@ function Dashboard() {
               ) : designList.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
                     <p className="text-slate-500 mb-4">Henüz hiç tasarımınız yok.</p>
-                    <button onClick={handleCreateNewFlow} className="text-blue-600 hover:underline font-medium">İlk tasarımını oluştur</button>
+                    <Button variant="text" onClick={handleCreateNewFlow} sx={{ textTransform: 'none' }}>
+                      İlk tasarımını oluştur
+                    </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -516,16 +470,17 @@ function Dashboard() {
                   ))}
                 </div>
               )}
-            </div>
-          )}
+            </TabPanel>
 
-          {/* 5. TAB: Çalışan Hiyerarşisi (Designer only) */}
-          {isDesigner && activeTab === 'org-chart' && (
-            <div className="h-full">
-              <EmployeesOrgChartFlow />
-            </div>
-          )}
-        </div>
+            {isDesigner ? (
+              <TabPanel value="org-chart" sx={{ p: 0 }}>
+                <div className="h-full">
+                  <EmployeesOrgChartFlow />
+                </div>
+              </TabPanel>
+            ) : null}
+          </div>
+        </TabContext>
       </div>
 
       {/* İzin Talep Modal */}
@@ -533,9 +488,14 @@ function Dashboard() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={async (payload) => {
-          await LeaveRequestsApi.createLeaveRequest(payload)
-          setToast({ type: 'success', message: 'İzin talebi başarıyla oluşturuldu.' })
-          await fetchMyLeaveRequests()
+          try {
+            await LeaveRequestsApi.createLeaveRequest(payload)
+            notify.success('İzin talebi başarıyla oluşturuldu.')
+            await fetchMyLeaveRequests()
+          } catch (err) {
+            notifyApiError(err, 'İzin talebi oluşturulamadı.')
+            throw err
+          }
         }}
       />
 

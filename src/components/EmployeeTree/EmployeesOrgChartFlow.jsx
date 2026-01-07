@@ -7,6 +7,8 @@ import { getDetail, updateEmployee, deleteEmployee, getEmployeeAncestors } from 
 import EmployeeAncestorsPanel from './EmployeeAncestorsPanel';
 import { useAuth } from '../../auth/AuthContext';
 import { AuthService } from '../../services/authService';
+import { confirmToast } from '../../utils/notify';
+import { Button } from '@mui/material';
 
 function EmployeeCardNode({ data }) {
   const { employee, isMatched, isSelected } = data || {};
@@ -542,11 +544,13 @@ function EmployeesOrgChartFlow() {
 
   const handleDelete = async () => {
     if (!selectedNodeId) return;
-    // Basit confirm; istersen sonra custom modal yapabiliriz
-    // eslint-disable-next-line no-alert
-    const ok = window.confirm(
-      'Bu çalışan ve tüm alt çalışanları silinecek. Emin misiniz?'
-    );
+    const ok = await confirmToast({
+      title: 'Çalışan silinsin mi?',
+      message: 'Bu çalışan ve tüm alt çalışanları silinecek. Bu işlem geri alınamaz.',
+      confirmText: 'Evet, sil',
+      cancelText: 'Vazgeç',
+      tone: 'error',
+    });
     if (!ok) return;
 
     setDeleteLoading(true);
@@ -619,20 +623,24 @@ function EmployeesOrgChartFlow() {
               className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <button
+          <Button
             type="button"
+            variant="outlined"
+            size="small"
             onClick={refetch}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
+            sx={{ textTransform: 'none' }}
           >
             Yenile
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="contained"
+            size="small"
             onClick={openAddModal}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
+            sx={{ textTransform: 'none' }}
           >
             Yeni Çalışan
-          </button>
+          </Button>
         </div>
 
         <div className="relative mt-1 h-80 sm:h-96 rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
@@ -736,22 +744,27 @@ function EmployeesOrgChartFlow() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="contained"
+                  size="small"
                   onClick={handleStartEdit}
                   disabled={detailLoading || deleteLoading}
-                  className="rounded-md bg-blue-600 px-3 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  sx={{ textTransform: 'none' }}
                 >
                   Düzenle
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="contained"
+                  color="error"
+                  size="small"
                   onClick={handleDelete}
                   disabled={detailLoading || deleteLoading}
-                  className="rounded-md bg-red-600 px-3 py-1 text-[11px] font-medium text-white shadow-sm hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+                  sx={{ textTransform: 'none' }}
                 >
                   {deleteLoading ? 'Siliniyor…' : 'Sil'}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -900,24 +913,28 @@ function EmployeesOrgChartFlow() {
             </div>
 
             <div className="mt-3 flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outlined"
+                size="small"
                 onClick={() => {
                   setIsEditing(false);
                   setFeedbackMessage(null);
                 }}
                 disabled={editSaving}
-                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed"
+                sx={{ textTransform: 'none' }}
               >
                 İptal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
+                variant="contained"
+                size="small"
                 disabled={editSaving}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                sx={{ textTransform: 'none' }}
               >
                 {editSaving ? 'Kaydediliyor…' : 'Kaydet'}
-              </button>
+              </Button>
             </div>
           </form>
         )}
@@ -934,14 +951,27 @@ function EmployeesOrgChartFlow() {
                   Yeni Çalışan Ekle
                 </h3>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="text"
                 onClick={closeAddModal}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 aria-label="Kapat"
+                sx={{
+                  minWidth: 0,
+                  padding: 0,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 9999,
+                  textTransform: 'none',
+                  color: 'rgba(148, 163, 184, 1)',
+                  '&:hover': {
+                    color: 'rgba(71, 85, 105, 1)',
+                    backgroundColor: 'rgba(241, 245, 249, 1)',
+                  },
+                }}
               >
                 ✕
-              </button>
+              </Button>
             </div>
 
             {!isAdmin ? (
@@ -963,9 +993,13 @@ function EmployeesOrgChartFlow() {
                 <div className="mt-2 text-[11px] text-emerald-800/80">
                   employeeId: {provisionResult.employeeId} • path: {provisionResult.path}
                 </div>
-                <button
+                <Button
                   type="button"
-                  className="mt-2 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  className="mt-2"
+                  sx={{ textTransform: 'none' }}
                   onClick={async () => {
                     try {
                       await navigator.clipboard.writeText(provisionResult.temporaryPassword);
@@ -975,7 +1009,7 @@ function EmployeesOrgChartFlow() {
                   }}
                 >
                   Kopyala
-                </button>
+                </Button>
               </div>
             ) : null}
 
@@ -1084,21 +1118,25 @@ function EmployeesOrgChartFlow() {
               </div>
 
               <div className="mt-4 flex justify-end gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outlined"
+                  size="small"
                   onClick={closeAddModal}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
                   disabled={provisionLoading}
+                  sx={{ textTransform: 'none' }}
                 >
                   Kapat
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  variant="contained"
+                  size="small"
                   disabled={provisionLoading || !isAdmin}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                  sx={{ textTransform: 'none' }}
                 >
                   {provisionLoading ? 'Oluşturuluyor…' : 'Kaydet'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

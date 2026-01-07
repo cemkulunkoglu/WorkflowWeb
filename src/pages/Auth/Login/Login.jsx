@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../auth/AuthContext'
+import { Button } from '@mui/material'
 import '../auth.css'
 
 function Login({ onSwitchToRegister }) {
@@ -127,10 +128,13 @@ function Login({ onSwitchToRegister }) {
           </label>
 
           <div className="pt-2 space-y-3">
-            <button
+            <Button
               type="submit"
+              variant="contained"
+              fullWidth
               disabled={isLoading}
               className={`w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02] hover:shadow-xl flex justify-center items-center gap-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              sx={{ textTransform: 'none' }}
             >
               {isLoading ? (
                 <>
@@ -143,15 +147,18 @@ function Login({ onSwitchToRegister }) {
               ) : (
                 'Giriş Yap'
               )}
-            </button>
+            </Button>
             
-            <button
+            <Button
               type="button"
+              variant="outlined"
+              fullWidth
               onClick={onSwitchToRegister}
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-lg shadow transition-all duration-200 transform hover:scale-[1.02] border border-slate-200"
+              sx={{ textTransform: 'none' }}
             >
               Kayıt Ol
-            </button>
+            </Button>
           </div>
 
           <div className="pt-4 border-t border-slate-200">
