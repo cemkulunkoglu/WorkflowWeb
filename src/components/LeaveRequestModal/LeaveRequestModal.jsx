@@ -1,39 +1,97 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
-    fullName: '',
     startDate: '',
-    endDate: ''
+    endDate: '',
+    reason: '',
   })
+  const [errors, setErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleChange = (e) => {
+    setSubmitError('')
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     })
   }
 
-  const handleSubmit = (e) => {
+  const dayCount = useMemo(() => {
+    const { startDate, endDate } = formData
+    if (!startDate || !endDate) return 0
+    const start = new Date(`${startDate}T00:00:00`)
+    const end = new Date(`${endDate}T00:00:00`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0
+    if (end < start) return 0
+    const diffMs = end.getTime() - start.getTime()
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+    return diffDays + 1 // inclusive
+  }, [formData])
+
+  useEffect(() => {
+    if (!isOpen) return
+    // modal açıldığında eski hataları temizle
+    setErrors({})
+    setSubmitError('')
+    setIsSubmitting(false)
+  }, [isOpen])
+
+  const validate = () => {
+    const next = {}
+    if (!formData.startDate) next.startDate = 'Başlangıç tarihi boş olamaz.'
+    if (!formData.endDate) next.endDate = 'Bitiş tarihi boş olamaz.'
+    if (formData.startDate && formData.endDate) {
+      const start = new Date(`${formData.startDate}T00:00:00`)
+      const end = new Date(`${formData.endDate}T00:00:00`)
+      if (end < start) next.endDate = 'Bitiş tarihi, başlangıç tarihinden küçük olamaz.'
+    }
+    const reason = (formData.reason || '').trim()
+    if (reason.length < 3) next.reason = 'Açıklama en az 3 karakter olmalı.'
+    return next
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Form gönderimi buraya eklenecek
-    console.log('İzin talep formu gönderiliyor:', formData)
-    onSubmit(formData)
-    // Formu sıfırla
-    setFormData({
-      fullName: '',
-      startDate: '',
-      endDate: ''
-    })
-    onClose()
+    const nextErrors = validate()
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
+
+    try {
+      setIsSubmitting(true)
+      setSubmitError('')
+      await onSubmit({
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        reason: formData.reason.trim(),
+      })
+      // başarılı -> reset + close
+      setFormData({
+        startDate: '',
+        endDate: '',
+        reason: '',
+      })
+      onClose()
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'İzin talebi oluşturulurken bir hata oluştu.'
+      setSubmitError(msg)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleClose = () => {
     setFormData({
-      fullName: '',
       startDate: '',
-      endDate: ''
+      endDate: '',
+      reason: '',
     })
+    setErrors({})
+    setSubmitError('')
     onClose()
   }
 
@@ -54,26 +112,13 @@ function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label 
-              htmlFor="fullName" 
-              className="block text-sm font-semibold text-slate-700 mb-2"
-            >
-              Ad Soyad
-            </label>
-            <input
-              id="fullName"
-              name="fullName"
-              type="text"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="Adınız ve soyadınız"
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all duration-200"
-              required
-            />
+        {submitError ? (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError}
           </div>
+        ) : null}
 
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label 
               htmlFor="startDate" 
@@ -90,6 +135,9 @@ function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all duration-200"
               required
             />
+            {errors.startDate ? (
+              <p className="mt-2 text-xs text-red-600">{errors.startDate}</p>
+            ) : null}
           </div>
 
           <div>
@@ -108,21 +156,54 @@ function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all duration-200"
               required
             />
+            {errors.endDate ? (
+              <p className="mt-2 text-xs text-red-600">{errors.endDate}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <label
+              htmlFor="reason"
+              className="block text-sm font-semibold text-slate-700 mb-2"
+            >
+              Açıklama
+            </label>
+            <textarea
+              id="reason"
+              name="reason"
+              rows={4}
+              value={formData.reason}
+              onChange={handleChange}
+              placeholder="İzin talebi açıklaması"
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition-all duration-200 resize-none"
+            />
+            {errors.reason ? (
+              <p className="mt-2 text-xs text-red-600">{errors.reason}</p>
+            ) : null}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 flex items-center justify-between">
+            <span className="font-semibold">Gün Sayısı</span>
+            <span>{dayCount > 0 ? dayCount : '-'}</span>
           </div>
 
           <div className="flex gap-3 pt-4">
             <button
               type="button"
               onClick={handleClose}
+              disabled={isSubmitting}
               className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors duration-200"
             >
               İptal
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
+              disabled={isSubmitting}
+              className={`flex-1 px-4 py-3 text-white font-semibold rounded-lg transition-colors duration-200 ${
+                isSubmitting ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
             >
-              Gönder
+              {isSubmitting ? 'Gönderiliyor...' : 'Gönder'}
             </button>
           </div>
         </form>

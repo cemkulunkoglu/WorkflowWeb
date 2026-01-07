@@ -1,4 +1,7 @@
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_API_URL || 'https://localhost:7130/api/Auth';
+// Backward compatible:
+// - Yeni: VITE_WORKFLOW_API_BASE_URL (host) + aşağıdaki sabit path’ler relative çalışır.
+// - Eski: VITE_WORKFLOW_API_URL (tam base, ör: https://localhost:7071/api/WorkflowEngine)
 const WORKFLOW_BASE_URL = import.meta.env.VITE_WORKFLOW_API_URL || 'https://localhost:7071/api/WorkflowEngine';
 
 export const API_ROUTES = {

@@ -3,7 +3,7 @@ import { TOKEN_KEY } from './apiConfig';
 import { authStorage } from '../auth/authStorage';
 
 const axiosClient = axios.create({
-  baseURL: 'https://localhost:7071',
+  baseURL: import.meta.env.VITE_WORKFLOW_API_BASE_URL || 'https://localhost:7071',
   headers: {
     'Content-Type': 'application/json',
   },

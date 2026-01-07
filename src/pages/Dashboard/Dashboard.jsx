@@ -5,6 +5,7 @@ import NotesFlow from '../../components/Notes/NotesFlow'
 import EmployeesOrgChartFlow from '../../components/EmployeeTree/EmployeesOrgChartFlow'
 import { useAuth } from '../../auth/AuthContext'
 import MessagesPanel from '../../components/Messages/MessagesPanel'
+import { LeaveRequestsApi } from '../../api/leaveRequestsApi'
 
 // Backend bağlantısı için gerekli importlar
 import axiosClient from '../../config/axiosClient'
@@ -19,6 +20,16 @@ function Dashboard() {
   // Akış tasarımları için state
   const [designList, setDesignList] = useState([])
   const [isLoadingDesigns, setIsLoadingDesigns] = useState(false)
+
+  // Leave requests state
+  const [leaveRequests, setLeaveRequests] = useState([])
+  const [isLoadingLeaveRequests, setIsLoadingLeaveRequests] = useState(false)
+  const [leaveRequestsError, setLeaveRequestsError] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [reasonQuery, setReasonQuery] = useState('')
+
+  // lightweight toast
+  const [toast, setToast] = useState(null) // { type: 'success'|'error', message: string }
 
   // Flow Editor Modal State
   const [showFlowModal, setShowFlowModal] = useState(false)
@@ -67,6 +78,35 @@ function Dashboard() {
     }
   }, [activeTab]);
 
+  const fetchMyLeaveRequests = async () => {
+    setIsLoadingLeaveRequests(true)
+    setLeaveRequestsError('')
+    try {
+      const data = await LeaveRequestsApi.getMyLeaveRequests()
+      setLeaveRequests(data || [])
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'İzin talepleri yüklenirken hata oluştu.'
+      setLeaveRequestsError(msg)
+    } finally {
+      setIsLoadingLeaveRequests(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'taleplerim') {
+      fetchMyLeaveRequests()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   // Designer değilse org-chart tabında kalmasın
   useEffect(() => {
     if (!isDesigner && activeTab === 'org-chart') {
@@ -110,7 +150,58 @@ function Dashboard() {
     { id: 2, ad: 'Masraf Bildirimi', tarih: '18.11.2024', durum: 'Tamamlandı' }
   ]
   const gelenKutusu = []
-  const taleplerim = []
+
+  const filteredLeaveRequests = leaveRequests
+    .filter((x) => {
+      if (statusFilter === 'All') return true
+      const s = (x?.Status ?? '').toString().toLowerCase()
+      return s === statusFilter.toLowerCase()
+    })
+    .filter((x) => {
+      const q = reasonQuery.trim().toLowerCase()
+      if (!q) return true
+      return (x?.Reason ?? '').toString().toLowerCase().includes(q)
+    })
+    .sort((a, b) => {
+      // Yeniden eskiye: CreatedAtUtc desc
+      const da = a?.CreatedAtUtc ? new Date(a.CreatedAtUtc).getTime() : NaN
+      const db = b?.CreatedAtUtc ? new Date(b.CreatedAtUtc).getTime() : NaN
+
+      const aHas = Number.isFinite(da)
+      const bHas = Number.isFinite(db)
+      if (aHas && bHas) return db - da
+      if (aHas && !bHas) return -1
+      if (!aHas && bHas) return 1
+
+      // fallback: StartDate desc
+      const sa = a?.StartDate ? new Date(a.StartDate).getTime() : NaN
+      const sb = b?.StartDate ? new Date(b.StartDate).getTime() : NaN
+      const aS = Number.isFinite(sa)
+      const bS = Number.isFinite(sb)
+      if (aS && bS) return sb - sa
+      if (aS && !bS) return -1
+      if (!aS && bS) return 1
+
+      // fallback: LeaveRequestId desc (numeric)
+      const ia = Number(a?.LeaveRequestId)
+      const ib = Number(b?.LeaveRequestId)
+      if (Number.isFinite(ia) && Number.isFinite(ib)) return ib - ia
+      return 0
+    })
+
+  const formatDate = (value) => {
+    if (!value) return '-'
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return String(value)
+    return d.toLocaleDateString('tr-TR')
+  }
+
+  const formatDateTime = (value) => {
+    if (!value) return '-'
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return String(value)
+    return d.toLocaleString('tr-TR')
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -140,6 +231,20 @@ function Dashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {toast ? (
+          <div className="mb-4">
+            <div
+              className={`rounded-lg border px-4 py-3 text-sm ${
+                toast.type === 'success'
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-red-200 bg-red-50 text-red-800'
+              }`}
+            >
+              {toast.message}
+            </div>
+          </div>
+        ) : null}
+
         {/* Tab Menü */}
         <div className="mb-8">
           <div className="border-b border-slate-200 -mx-3 sm:mx-0">
@@ -245,19 +350,120 @@ function Dashboard() {
           {/* 3. TAB: Taleplerim */}
           {activeTab === 'taleplerim' && (
             <div>
-              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">Taleplerim</h2>
                   <p className="text-xs sm:text-sm text-slate-600">Oluşturduğunuz talepler</p>
                 </div>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 self-start sm:self-auto"
-                >
-                  Yeni Talep
-                </button>
+                <div className="flex flex-col gap-3 w-full sm:w-auto sm:items-end">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="w-full sm:w-44">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Durum</label>
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
+                      >
+                        <option value="All">All</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                    <div className="w-full sm:w-64">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Reason</label>
+                      <input
+                        value={reasonQuery}
+                        onChange={(e) => setReasonQuery(e.target.value)}
+                        placeholder="Açıklamada ara..."
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 self-start sm:self-auto"
+                  >
+                    Yeni Talep
+                  </button>
+                </div>
               </div>
-              <p className="text-slate-500 text-center py-8">Henüz talep bulunmamaktadır.</p>
+
+              {isLoadingLeaveRequests ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : leaveRequestsError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {leaveRequestsError}
+                </div>
+              ) : filteredLeaveRequests.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
+                  <p className="text-slate-500 mb-4">Henüz talep bulunmamaktadır.</p>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    İlk talebini oluştur
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-3 border-b border-slate-200">
+                          Başlangıç Tarihi
+                        </th>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-3 border-b border-slate-200">
+                          Bitiş Tarihi
+                        </th>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-3 border-b border-slate-200">
+                          Gün Sayısı
+                        </th>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-3 border-b border-slate-200">
+                          Açıklama
+                        </th>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-3 border-b border-slate-200">
+                          Durum
+                        </th>
+                        <th className="text-left text-xs font-semibold text-slate-600 px-4 py-3 border-b border-slate-200">
+                          Oluşturulma
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLeaveRequests.map((r, idx) => (
+                        <tr
+                          key={r.LeaveRequestId ?? idx}
+                          className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}
+                        >
+                          <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-200">
+                            {formatDate(r.StartDate)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-200">
+                            {formatDate(r.EndDate)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-200">
+                            {r.DayCount ?? '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-200 max-w-[420px]">
+                            <div className="truncate" title={r.Reason}>
+                              {r.Reason || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-200">
+                            {r.Status ?? '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700 border-b border-slate-200">
+                            {formatDateTime(r.CreatedAtUtc)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -326,7 +532,11 @@ function Dashboard() {
       <LeaveRequestModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={(data) => console.log(data)}
+        onSubmit={async (payload) => {
+          await LeaveRequestsApi.createLeaveRequest(payload)
+          setToast({ type: 'success', message: 'İzin talebi başarıyla oluşturuldu.' })
+          await fetchMyLeaveRequests()
+        }}
       />
 
       {/* Flow Editor Modal */}
