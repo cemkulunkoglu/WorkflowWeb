@@ -7,7 +7,7 @@ import { useAuth } from '../../auth/AuthContext'
 import MessagesPanel from '../../components/Messages/MessagesPanel'
 import { LeaveRequestsApi } from '../../api/leaveRequestsApi'
 import { notify, notifyApiError } from '../../utils/notify'
-import { Button, Box, Tab } from '@mui/material'
+import { Button, Box, Tab, Alert } from '@mui/material'
 import { TabContext, TabList, TabPanel } from '@mui/lab'
 
 // Backend bağlantısı için gerekli importlar
@@ -304,7 +304,6 @@ function Dashboard() {
                 <div className="flex flex-col gap-3 w-full sm:w-auto sm:items-end">
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <div className="w-full sm:w-44">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Durum</label>
                       <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -317,7 +316,6 @@ function Dashboard() {
                       </select>
                     </div>
                     <div className="w-full sm:w-64">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">Reason</label>
                       <input
                         value={reasonQuery}
                         onChange={(e) => setReasonQuery(e.target.value)}
@@ -325,8 +323,7 @@ function Dashboard() {
                         className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
                       />
                     </div>
-                  </div>
-                  <Button
+                    <Button
                     variant="contained"
                     onClick={() => setIsModalOpen(true)}
                     className="self-start sm:self-auto"
@@ -334,6 +331,7 @@ function Dashboard() {
                   >
                     Yeni Talep
                   </Button>
+                  </div>
                 </div>
               </div>
 
@@ -342,9 +340,9 @@ function Dashboard() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : leaveRequestsError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <Alert severity="error" className="mb-4">
                   {leaveRequestsError}
-                </div>
+                </Alert>
               ) : filteredLeaveRequests.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
                   <p className="text-slate-500 mb-4">Henüz talep bulunmamaktadır.</p>

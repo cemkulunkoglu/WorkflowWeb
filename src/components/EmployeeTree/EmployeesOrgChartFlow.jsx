@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { AuthService } from '../../services/authService';
 import { confirmToast } from '../../utils/notify';
 import { Button } from '@mui/material';
+import { Alert } from '@mui/material';
 
 function EmployeeCardNode({ data }) {
   const { employee, isMatched, isSelected } = data || {};
@@ -196,6 +197,28 @@ function EmployeesOrgChartFlow() {
   const [depth, setDepth] = useState(10);
   const [includeSelf, setIncludeSelf] = useState(false);
   const ancestorsCacheRef = useRef(new Map());
+
+  const maxDepthForSelected = useMemo(() => {
+    // detail.path ör: "/5/6/17/" (root->...->selected). Buradan gerçek üst sayısını çıkarabiliriz.
+    const path = detail?.path;
+    if (!path) return 10;
+    const ids = path
+      .split('/')
+      .filter(Boolean)
+      .map((p) => Number(p))
+      .filter((n) => Number.isFinite(n));
+
+    if (!ids.length) return 10;
+
+    const totalIncludingSelf = ids.length;
+    const max = includeSelf ? totalIncludingSelf : totalIncludingSelf - 1;
+    return Math.max(1, max);
+  }, [detail, includeSelf]);
+
+  // Seçili çalışanın gerçek üst sayısına göre depth'i clamp et
+  useEffect(() => {
+    setDepth((prev) => Math.min(Math.max(1, prev), maxDepthForSelected));
+  }, [maxDepthForSelected]);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -655,10 +678,10 @@ function EmployeesOrgChartFlow() {
 
           {error && !loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80">
-              <div className="max-w-sm rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 shadow-sm">
-                <div className="mb-1 font-semibold">Bir hata oluştu</div>
+              <Alert severity="error" className="max-w-sm shadow-sm">
+                <div className="font-semibold mb-1">Bir hata oluştu</div>
                 <div>{error}</div>
-              </div>
+              </Alert>
             </div>
           )}
 
@@ -697,6 +720,7 @@ function EmployeesOrgChartFlow() {
           }
           ancestors={ancestors}
           depth={depth}
+          maxDepth={maxDepthForSelected}
           includeSelf={includeSelf}
           isLoading={ancestorsLoading}
           error={ancestorsError}
@@ -721,15 +745,15 @@ function EmployeesOrgChartFlow() {
         )}
 
         {detailError && (
-          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700">
+          <Alert severity="error" className="mt-2">
             {detailError}
-          </div>
+          </Alert>
         )}
 
         {feedbackMessage && !detailError && (
-          <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-700">
+          <Alert severity="success" className="mt-2">
             {feedbackMessage}
-          </div>
+          </Alert>
         )}
 
         {selectedNodeId && detail && !isEditing && (
@@ -975,22 +999,22 @@ function EmployeesOrgChartFlow() {
             </div>
 
             {!isAdmin ? (
-              <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+              <Alert severity="warning" className="mb-3">
                 Yetkin yok: Bu işlem sadece admin kullanıcılar içindir.
-              </div>
+              </Alert>
             ) : null}
 
             {provisionError && (
-              <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700">
+              <Alert severity="error" className="mb-3">
                 {provisionError}
-              </div>
+              </Alert>
             )}
 
             {provisionResult?.temporaryPassword ? (
-              <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <Alert severity="success" className="mb-3">
                 <div className="font-semibold">Temporary Password</div>
                 <div className="mt-1 font-mono">{provisionResult.temporaryPassword}</div>
-                <div className="mt-2 text-[11px] text-emerald-800/80">
+                <div className="mt-2 text-[11px] opacity-80">
                   employeeId: {provisionResult.employeeId} • path: {provisionResult.path}
                 </div>
                 <Button
@@ -1010,7 +1034,7 @@ function EmployeesOrgChartFlow() {
                 >
                   Kopyala
                 </Button>
-              </div>
+              </Alert>
             ) : null}
 
             <form onSubmit={handleProvisionSubmit} className="space-y-3 text-xs">

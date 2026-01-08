@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@mui/material'
+import { Alert } from '@mui/material'
 
 function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState({
@@ -116,11 +117,7 @@ function LeaveRequestModal({ isOpen, onClose, onSubmit }) {
           </Button>
         </div>
 
-        {submitError ? (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {submitError}
-          </div>
-        ) : null}
+        {submitError ? <Alert severity="error" className="mb-4">{submitError}</Alert> : null}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>

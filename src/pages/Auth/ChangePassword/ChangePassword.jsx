@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AuthService } from "../../../auth/authService";
 import { useAuth } from "../../../auth/AuthContext";
 import { Button } from "@mui/material";
+import { Alert } from "@mui/material";
 import "../auth.css";
 
 export default function ChangePassword() {
@@ -74,21 +75,21 @@ export default function ChangePassword() {
         </div>
 
         {flash ? (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm">
+          <Alert severity="info" className="mb-4">
             {flash}
-          </div>
+          </Alert>
         ) : null}
 
         {error ? (
-          <div className="mb-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-lg text-sm">
+          <Alert severity="error" className="mb-4">
             {error}
-          </div>
+          </Alert>
         ) : null}
 
         {info ? (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm">
+          <Alert severity="success" className="mb-4">
             {info}
-          </div>
+          </Alert>
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4">

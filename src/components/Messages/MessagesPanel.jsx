@@ -5,6 +5,7 @@ import { MessagesApi } from "../../services/messagesApi";
 import { Button } from "@mui/material";
 import { Box, Tab } from "@mui/material";
 import { TabContext, TabList, TabPanel } from "@mui/lab";
+import { Alert } from "@mui/material";
 
 function getField(obj, keys) {
   for (const k of keys) {
@@ -339,16 +340,16 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
       ) : null}
 
       {!canUseApi ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm">
+        <Alert severity="warning">
           Token içinde <span className="font-semibold">employeeId</span> claim’i
           bulunamadı. Listeleme için gerekli.
-        </div>
+        </Alert>
       ) : null}
 
       {error ? (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
+        <Alert severity="error" className="mt-4">
           {error}
-        </div>
+        </Alert>
       ) : null}
 
       <div className="mt-4">

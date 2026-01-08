@@ -1,9 +1,13 @@
 import React, { useMemo } from 'react';
 import { Button } from '@mui/material';
+import { Slider } from '@mui/material';
 
 function formatDepthLabel(depth) {
-  if (!depth) return '10';
-  return String(depth);
+  return String(depth ?? '');
+}
+
+function valuetext(value) {
+  return `${value}`;
 }
 
 export default function EmployeeAncestorsPanel({
@@ -11,6 +15,7 @@ export default function EmployeeAncestorsPanel({
   selectedEmployeeLabel,
   ancestors,
   depth,
+  maxDepth = 10,
   includeSelf,
   isLoading,
   error,
@@ -37,14 +42,22 @@ export default function EmployeeAncestorsPanel({
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-xs text-slate-700">
           <span className="text-[11px] font-medium text-slate-600">Üst seviye sayısı</span>
-          <input
-            type="range"
-            min={1}
-            max={10}
-            value={depth}
-            onChange={(e) => onDepthChange(Number(e.target.value))}
-            disabled={!selectedEmployeeId}
-          />
+          <div className="w-44 sm:w-56">
+            <Slider
+              aria-label="Üst seviye sayısı"
+              value={depth}
+              getAriaValueText={valuetext}
+              step={1}
+              marks
+              min={1}
+              max={Math.max(1, Number(maxDepth) || 1)}
+              valueLabelDisplay="auto"
+              size="small"
+              disabled={!selectedEmployeeId}
+              onChange={(_, v) => onDepthChange(Number(v))}
+              sx={{ py: 0.5 }}
+            />
+          </div>
           <span className="min-w-[18px] text-[11px] text-slate-600">
             {formatDepthLabel(depth)}
           </span>
