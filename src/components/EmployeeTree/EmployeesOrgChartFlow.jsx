@@ -7,7 +7,7 @@ import { getDetail, updateEmployee, deleteEmployee, getEmployeeAncestors } from 
 import EmployeeAncestorsPanel from './EmployeeAncestorsPanel';
 import { useAuth } from '../../auth/AuthContext';
 import { AuthService } from '../../services/authService';
-import { confirmToast } from '../../utils/notify';
+import ConfirmDialog from '../common/ConfirmDialog';
 import { Button } from '@mui/material';
 import { Alert } from '@mui/material';
 
@@ -231,6 +231,7 @@ function EmployeesOrgChartFlow() {
   });
   const [editSaving, setEditSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState(null);
 
   // Başarı mesajını bir süre sonra otomatik gizle
@@ -565,16 +566,15 @@ function EmployeesOrgChartFlow() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!selectedNodeId) return;
-    const ok = await confirmToast({
-      title: 'Çalışan silinsin mi?',
-      message: 'Bu çalışan ve tüm alt çalışanları silinecek. Bu işlem geri alınamaz.',
-      confirmText: 'Evet, sil',
-      cancelText: 'Vazgeç',
-      tone: 'error',
-    });
-    if (!ok) return;
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteDialogClose = async (confirmed) => {
+    setDeleteDialogOpen(false);
+    if (!confirmed) return;
+    if (!selectedNodeId) return;
 
     setDeleteLoading(true);
     setDetailError(null);
@@ -612,6 +612,15 @@ function EmployeesOrgChartFlow() {
 
   return (
     <div className="flex flex-col gap-4 md:flex-row h-full">
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Çalışan silinsin mi?"
+        description="Bu çalışan ve tüm alt çalışanları silinecek. Bu işlem geri alınamaz."
+        confirmText="Evet, sil"
+        cancelText="Vazgeç"
+        tone="error"
+        onClose={handleDeleteDialogClose}
+      />
       {/* Sol: Arama + React Flow */}
       <section className="md:flex-[2] flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
@@ -1010,30 +1019,9 @@ function EmployeesOrgChartFlow() {
               </Alert>
             )}
 
-            {provisionResult?.temporaryPassword ? (
+            {provisionResult ? (
               <Alert severity="success" className="mb-3">
-                <div className="font-semibold">Temporary Password</div>
-                <div className="mt-1 font-mono">{provisionResult.temporaryPassword}</div>
-                <div className="mt-2 text-[11px] opacity-80">
-                  employeeId: {provisionResult.employeeId} • path: {provisionResult.path}
-                </div>
-                <Button
-                  type="button"
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  className="mt-2"
-                  sx={{ textTransform: 'none' }}
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(provisionResult.temporaryPassword);
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                >
-                  Kopyala
-                </Button>
+                <div className="font-semibold">Çalışan oluşturuldu</div>
               </Alert>
             ) : null}
 
