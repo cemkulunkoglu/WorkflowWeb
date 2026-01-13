@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { getEmployeeIdFromToken } from "../../auth/jwtClaims";
 import { MessagesApi } from "../../services/messagesApi";
-import { Button } from "@mui/material";
+import { Badge, Button, Chip } from "@mui/material";
 import { Box, Tab } from "@mui/material";
 import { TabContext, TabList, TabPanel } from "@mui/lab";
 import { Alert } from "@mui/material";
@@ -22,11 +22,19 @@ function formatDateTR(value) {
   return d.toLocaleString("tr-TR");
 }
 
+function normalizeBool(value) {
+  if (value === true || value === false) return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+  return null;
+}
+
 function normalizeMessage(raw) {
   const id = getField(raw, ["id", "messageId", "inboxId", "outboxId"]);
   const subject = getField(raw, ["subject", "title", "topic"]) || "(Konu yok)";
   const body =
     getField(raw, ["body", "message", "content", "text"]) || "";
+  const uiBody = getField(raw, ["uiBody", "ui_body"]);
   const fromEmail = getField(raw, [
     "fromEmail",
     "senderEmail",
@@ -45,22 +53,30 @@ function normalizeMessage(raw) {
     "createTime",
     "createdOn",
   ]);
-  const updateDate = getField(raw, [
-    "updateDate",
-    "updatedAt",
-    "updateTime",
-    "updatedOn",
-  ]);
+
+  // Inbox read info
+  const isRead = normalizeBool(getField(raw, ["isRead"]));
+  const readAt = getField(raw, ["readAt"]);
+  const outboxId = getField(raw, ["outboxId"]);
+
+  // Outbox read info (receiver side)
+  const isReadByReceiver = normalizeBool(getField(raw, ["isReadByReceiver"]));
+  const readByReceiverAt = getField(raw, ["readByReceiverAt"]);
 
   return {
     raw,
     id,
     subject: String(subject),
     body: String(body),
+    uiBody: uiBody ? String(uiBody) : null,
     fromEmail: fromEmail ? String(fromEmail) : null,
     toEmail: toEmail ? String(toEmail) : null,
     createDate,
-    updateDate,
+    isRead,
+    readAt,
+    outboxId,
+    isReadByReceiver,
+    readByReceiverAt,
   };
 }
 
@@ -100,16 +116,68 @@ function MessageModal({ open, onClose, title, children }) {
   );
 }
 
-function ListRow({ msg, rightBadge, onClick }) {
+function InboxTabLabel({ unreadCount }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        pr: unreadCount > 0 ? 2.5 : 0, // badge için sağdan boşluk
+      }}
+    >
+      <span>Gelen Kutusu</span>
+      <Badge
+        badgeContent={unreadCount}
+        color="primary"
+        invisible={!unreadCount || unreadCount <= 0}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        sx={{
+          position: "absolute",
+          top: 2,
+          right: 2,
+          pointerEvents: "none",
+          "& .MuiBadge-badge": {
+            fontSize: 11,
+            height: 18,
+            minWidth: 18,
+          },
+        }}
+      >
+        <span style={{ display: "block", width: 1, height: 1 }} />
+      </Badge>
+    </Box>
+  );
+}
+
+function ListRow({ msg, rightBadge, onClick, unread = false }) {
   const preview = msg.body.length > 140 ? `${msg.body.slice(0, 140)}…` : msg.body;
   return (
     <div
-      className="w-full text-left border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-slate-300 transition bg-white"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.();
+      }}
+      className="w-full text-left border border-slate-200 rounded-lg p-4 hover:shadow-md hover:border-slate-300 transition bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <div className="font-semibold text-slate-900 truncate">
+            {unread ? (
+              <span
+                className="inline-block h-2 w-2 rounded-full bg-blue-600"
+                aria-label="Okunmadı"
+                title="Okunmadı"
+              />
+            ) : null}
+            <div
+              className={`truncate ${
+                unread ? "font-bold text-slate-900" : "font-semibold text-slate-900"
+              }`}
+            >
               {msg.subject}
             </div>
           </div>
@@ -124,9 +192,6 @@ function ListRow({ msg, rightBadge, onClick }) {
           </div>
           <div className="mt-2 text-xs text-slate-400">
             Oluşturma: {formatDateTR(msg.createDate)}
-            {msg.updateDate
-              ? ` • Güncelleme: ${formatDateTR(msg.updateDate)}`
-              : ""}
           </div>
         </div>
         <div className="shrink-0">{rightBadge}</div>
@@ -148,6 +213,8 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
 
   const [selected, setSelected] = useState(null); // { box: 'inbox'|'outbox', msg }
   const [markingRead, setMarkingRead] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
 
   const [compose, setCompose] = useState({
     toEmployeeId: "",
@@ -159,6 +226,20 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
   const [sendResult, setSendResult] = useState(null);
 
   const canUseApi = employeeId != null;
+
+  const isInboxRead = (m) => {
+    if (!m) return false;
+    if (m.isRead === true) return true;
+    if (m.isRead === false) return false;
+    return Boolean(m.readAt);
+  };
+
+  const isOutboxReadByReceiver = (m) => {
+    if (!m) return false;
+    if (m.isReadByReceiver === true) return true;
+    if (m.isReadByReceiver === false) return false;
+    return Boolean(m.readByReceiverAt);
+  };
 
   const fetchInbox = async () => {
     if (!canUseApi) return;
@@ -211,30 +292,90 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
 
   const openMessage = async (box, msg) => {
     setSelected({ box, msg });
+    setDetailError(null);
 
     if (box !== "inbox") return;
     if (!msg?.id) return;
-    if (msg.updateDate) return; // zaten okundu
 
-    setMarkingRead(true);
+    // Modal açılınca detayı çek (body template vs.)
+    setDetailLoading(true);
     try {
-      await MessagesApi.markInboxRead(msg.id);
-      const nowIso = new Date().toISOString();
-      setInbox((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, updateDate: nowIso } : m))
-      );
+      const detail = await MessagesApi.getInboxMessage(msg.id);
+      const normalized = normalizeMessage(detail);
       setSelected((prev) =>
         prev?.msg?.id === msg.id
-          ? { ...prev, msg: { ...prev.msg, updateDate: nowIso } }
+          ? {
+              ...prev,
+              msg: {
+                ...prev.msg,
+                // Detaydan gelen body/konu vb. varsa üzerine yaz
+                ...normalized,
+              },
+            }
           : prev
       );
     } catch (err) {
-      // Okundu işaretleme başarısız olsa da modal açık kalsın.
-      setError(
+      setDetailError(
         err?.response?.data?.message ||
           err?.message ||
-          "Mesaj okundu olarak işaretlenemedi."
+          "Mesaj detayı alınamadı."
       );
+    } finally {
+      setDetailLoading(false);
+    }
+
+    // Detay geldikten sonra okundu işaretle (receiver side)
+    if (isInboxRead(msg)) return; // zaten okundu
+    if (markingRead) return;
+
+    setMarkingRead(true);
+    const prevIsRead = msg.isRead;
+    const prevReadAt = msg.readAt;
+    const optimisticReadAt = new Date().toISOString();
+
+    // Optimistic UI
+    setInbox((prev) =>
+      prev.map((m) =>
+        m.id === msg.id ? { ...m, isRead: true, readAt: optimisticReadAt } : m
+      )
+    );
+    setSelected((prev) =>
+      prev?.msg?.id === msg.id
+        ? { ...prev, msg: { ...prev.msg, isRead: true, readAt: optimisticReadAt } }
+        : prev
+    );
+
+    try {
+      const res = await MessagesApi.markInboxRead(msg.id);
+
+      const serverReadAt =
+        getField(res, ["readAt"]) ||
+        getField(res?.data, ["readAt"]) ||
+        optimisticReadAt;
+
+      setInbox((prev) =>
+        prev.map((m) =>
+          m.id === msg.id ? { ...m, isRead: true, readAt: serverReadAt } : m
+        )
+      );
+      setSelected((prev) =>
+        prev?.msg?.id === msg.id
+          ? { ...prev, msg: { ...prev.msg, isRead: true, readAt: serverReadAt } }
+          : prev
+      );
+    } catch (err) {
+      // revert optimistic change
+      setInbox((prev) =>
+        prev.map((m) =>
+          m.id === msg.id ? { ...m, isRead: prevIsRead, readAt: prevReadAt } : m
+        )
+      );
+      setSelected((prev) =>
+        prev?.msg?.id === msg.id
+          ? { ...prev, msg: { ...prev.msg, isRead: prevIsRead, readAt: prevReadAt } }
+          : prev
+      );
+      console.error("Mesaj okundu olarak işaretlenemedi:", err);
     } finally {
       setMarkingRead(false);
     }
@@ -288,11 +429,11 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
   };
 
   const unreadCount = useMemo(
-    () => inbox.filter((m) => !m.updateDate).length,
+    () => inbox.filter((m) => !isInboxRead(m)).length,
     [inbox]
   );
   const pendingCount = useMemo(
-    () => outbox.filter((m) => !m.updateDate).length,
+    () => outbox.filter((m) => !isOutboxReadByReceiver(m)).length,
     [outbox]
   );
 
@@ -359,30 +500,12 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
               <Tab
                 value="inbox"
                 sx={{ textTransform: "none" }}
-                label={
-                  <span>
-                    Gelen Kutusu{" "}
-                    {unreadCount > 0 ? (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
-                        {unreadCount} okunmadı
-                      </span>
-                    ) : null}
-                  </span>
-                }
+                label={<InboxTabLabel unreadCount={unreadCount} />}
               />
               <Tab
                 value="outbox"
                 sx={{ textTransform: "none" }}
-                label={
-                  <span>
-                    Giden Kutusu{" "}
-                    {pendingCount > 0 ? (
-                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
-                        {pendingCount} beklemede
-                      </span>
-                    ) : null}
-                  </span>
-                }
+                label="Giden Kutusu"
               />
               <Tab value="compose" label="Yeni Mesaj" sx={{ textTransform: "none" }} />
             </TabList>
@@ -405,22 +528,28 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
                     </div>
                   ) : (
                     inbox.map((m, idx) => {
-                      const unread = !m.updateDate;
+                      const unread = !isInboxRead(m);
+                      const readAt = m.readAt;
                       return (
                         <ListRow
                           key={m.id != null ? String(m.id) : `in-${idx}`}
                           msg={m}
                           onClick={() => openMessage("inbox", m)}
+                          unread={unread}
                           rightBadge={
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-                                unread
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : "bg-slate-50 text-slate-700 border-slate-200"
-                              }`}
-                            >
-                              {unread ? "Okunmadı" : "Okundu"}
-                            </span>
+                            <div className="text-right">
+                              <Chip
+                                label={unread ? "Okunmadı" : "Okundu"}
+                                color={unread ? "secondary" : "success"}
+                                variant={unread ? "outlined" : "filled"}
+                                size="small"
+                              />
+                              {!unread && readAt ? (
+                                <div className="mt-1 text-[11px] text-slate-400">
+                                  {formatDateTR(readAt)}
+                                </div>
+                              ) : null}
+                            </div>
                           }
                         />
                       );
@@ -439,22 +568,26 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
                     </div>
                   ) : (
                     outbox.map((m, idx) => {
-                      const sent = Boolean(m.updateDate);
+                      const read = isOutboxReadByReceiver(m);
+                      const readAt = m.readByReceiverAt;
                       return (
                         <ListRow
                           key={m.id != null ? String(m.id) : `out-${idx}`}
                           msg={m}
                           onClick={() => openMessage("outbox", m)}
                           rightBadge={
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-                                sent
-                                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                  : "bg-amber-50 text-amber-800 border-amber-200"
-                              }`}
-                            >
-                              {sent ? "Gönderildi" : "Beklemede"}
-                            </span>
+                            <div className="text-right">
+                              <Chip
+                                label={read ? "Okundu" : "Gönderildi"}
+                                color={read ? "success" : "primary"}
+                                size="small"
+                              />
+                              {read && readAt ? (
+                                <div className="mt-1 text-[11px] text-slate-400">
+                                  {formatDateTR(readAt)}
+                                </div>
+                              ) : null}
+                            </div>
                           }
                         />
                       );
@@ -566,6 +699,92 @@ export default function MessagesPanel({ showHeader = false, onBack }) {
           </div>
         </TabContext>
       </div>
+
+      <MessageModal
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        title={selected?.box === "inbox" ? "Gelen Mesaj" : "Giden Mesaj"}
+      >
+        {selected?.msg ? (
+          <div className="space-y-3">
+            {detailLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600" />
+                Mesaj yükleniyor…
+              </div>
+            ) : null}
+            {detailError ? (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">
+                {detailError}
+              </div>
+            ) : null}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-base font-bold text-slate-900 break-words">
+                  {selected.msg.subject}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {selected.msg.fromEmail ? (
+                    <span className="mr-3">Gönderen: {selected.msg.fromEmail}</span>
+                  ) : null}
+                  {selected.msg.toEmail ? <span>Alıcı: {selected.msg.toEmail}</span> : null}
+                </div>
+              </div>
+
+              <div className="shrink-0 text-right">
+                {selected.box === "inbox" ? (
+                  <div>
+                    <Chip
+                      label={isInboxRead(selected.msg) ? "Okundu" : "Okunmadı"}
+                      color={isInboxRead(selected.msg) ? "success" : "secondary"}
+                      variant={isInboxRead(selected.msg) ? "filled" : "outlined"}
+                      size="small"
+                    />
+                    {isInboxRead(selected.msg) && selected.msg.readAt ? (
+                      <div className="mt-1 text-[11px] text-slate-400">
+                        {formatDateTR(selected.msg.readAt)}
+                      </div>
+                    ) : null}
+                    {markingRead && !isInboxRead(selected.msg) ? (
+                      <div className="mt-1 text-[11px] text-slate-400">
+                        Okundu işaretleniyor…
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div>
+                    <Chip
+                      label={isOutboxReadByReceiver(selected.msg) ? "Okundu" : "Gönderildi"}
+                      color={isOutboxReadByReceiver(selected.msg) ? "success" : "primary"}
+                      size="small"
+                    />
+                    {isOutboxReadByReceiver(selected.msg) && selected.msg.readByReceiverAt ? (
+                      <div className="mt-1 text-[11px] text-slate-400">
+                        {formatDateTR(selected.msg.readByReceiverAt)}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-400">
+              Oluşturma: {formatDateTR(selected.msg.createDate)}
+            </div>
+
+            {selected.msg.uiBody ? (
+              <div
+                className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 overflow-auto"
+                dangerouslySetInnerHTML={{ __html: selected.msg.uiBody || "" }}
+              />
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 whitespace-pre-wrap break-words">
+                {selected.msg.body || "(İçerik yok)"}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </MessageModal>
     </div>
   );
 }
